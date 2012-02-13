@@ -18,42 +18,19 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef CLDD_DAEMON_H
-#define CLDD_DAEMON_H
-
-#include "cldd_error.h"
+#ifndef CLDD_CMDLINE_H
+#define CLDD_CMDLINE_H
 
 #include <stdbool.h>
 
-void
-daemonize_init (const char *user, const char *group, const char *pidfile);
+struct options {
+    gboolean kill;
+    gboolean daemon;
+    gboolean log_stderr;
+    gboolean verbose;
+};
 
-void
-daemonize_finish (void);
-
-/**
- * Kill the CLDD which is currently running, pid determined from the
- * pid file.
- */
-void
-daemonize_kill (void);
-
-/**
- * Close stdin (fd 0) and re-open it as /dev/null.
- */
-void
-daemonize_close_stdin (void);
-
-/**
- * Change to the configured Unix user.
- */
-void
-daemonize_set_user (void);
-
-/**
- * Daemonize the server in either attached or detached mode.
- */
-void
-daemonize (bool detach);
+bool
+parse_cmdline (int argc, char **argv, struct options *options, GError **error_r);
 
 #endif

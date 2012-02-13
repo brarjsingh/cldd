@@ -30,10 +30,6 @@
 #  include <unistd.h>
 #endif
 
-#if HAVE_PTHREAD_H
-#  include <pthread.h>
-#endif
-
 #if HAVE_MATH_H
 #  include <math.h>
 #endif
@@ -50,6 +46,7 @@
 #  include <tcpd.h>
 #endif
 
+#include <signal.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -60,6 +57,7 @@
 #include <getopt.h>
 #include <time.h>
 #include <assert.h>
+#include <pthread.h>
 
 #ifndef EXIT_SUCCESS
 #  define EXIT_SUCCESS  0
