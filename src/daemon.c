@@ -20,6 +20,7 @@
 
 #include <common.h>
 
+#include "cldd.h"
 #include "daemon.h"
 
 #include <grp.h>
@@ -83,11 +84,14 @@ daemonize_set_user (void)
     if (user_name == NULL)
         return;
 
+    /* technically not daemonized yet should consider replacing CLDD_ERROR
+     * with a call to err_sys */
+
     /* set gid */
     if (user_gid != (gid_t)-1 && user_gid != getgid ())
     {
         if (setgid (user_gid) == -1) {
-            CLDD_ERROR("cannot setgid to %d: %s",
+            CLDD_ERROR("Cannot setgid to %d: %s",
                        (int)user_gid, strerror (errno));
         }
     }
@@ -98,7 +102,7 @@ daemonize_set_user (void)
      */
     if (!had_group && initgroups (user_name, user_gid) == -1)
     {
-        fprintf (stderr, "cannot init supplementary groups "
+        fprintf (stderr, "Cannot init supplementary groups "
                          "of user \"%s\": %s\n",
                          user_name, strerror (errno));
     }
@@ -108,7 +112,7 @@ daemonize_set_user (void)
     if (user_uid != (uid_t)-1 && user_uid != getuid () &&
         setuid (user_uid) == -1)
     {
-        CLDD_ERROR("cannot change to uid of user \"%s\": %s",
+        CLDD_ERROR("Cannot change to uid of user \"%s\": %s",
                    user_name, strerror (errno));
     }
 }
@@ -158,6 +162,10 @@ void
 daemonize (bool detach)
 {
     FILE *fp = NULL;
+
+    /* stdout/err is already closed by this point so we should
+     * be using syslog for errors */
+    daemonized = true;
 
     if (pidfile != NULL)
     {

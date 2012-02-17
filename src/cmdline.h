@@ -18,19 +18,32 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef CLDD_CMDLINE_H
-#define CLDD_CMDLINE_H
+#ifndef _CLDD_CMDLINE_H
+#define _CLDD_CMDLINE_H
 
-#include <stdbool.h>
+#include "common.h"
+
+BEGIN_C_DECLS
 
 struct options {
-    gboolean kill;
-    gboolean daemon;
-    gboolean log_stderr;
-    gboolean verbose;
+    bool kill;
+    bool daemon;
+    bool log_stderr;
+    bool verbose;
 };
 
+/**
+ * parse_cmdline
+ *
+ * Parses the command line arguments that were passed in at launch.
+ *
+ * @param argc    Number of command line arguments
+ * @param argv    String list of arguments
+ * @param options Structure to hold the results of getopt
+ */
 bool
-parse_cmdline (int argc, char **argv, struct options *options, GError **error_r);
+parse_cmdline (int argc, char **argv, struct options *options;
+
+END_C_DECLS
 
 #endif

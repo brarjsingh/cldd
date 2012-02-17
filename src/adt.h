@@ -18,21 +18,61 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef CLDD_ERROR_H
-#define CLDD_ERROR_H
+#ifndef _CLDD_ADT_H
+#define _CLDD_ADT_H
 
-#include <stdlib.h>
+#include "common.h"
 
-/* This macro is used as an intermediate step to proper error handling
- * in cldd. It is used for unrecoverable error conditions and exits
- * immediately.
- * - need to evaluate the use of stderr in context with a daemon as it is going
- *   to be closed, might make more sense to use something else instead */
+BEGIN_C_DECLS
 
-#define CLDD_ERROR(...) \
-    do { \
-        fprintf (stderr, __VA_ARGS__); \
-        exit (EXIT_FAILURE); \
-    } while (0)
+typedef struct _node  node;
+typedef struct _llist llist;
+typedef struct _queue queue;
+
+struct _llist {
+    node *next;
+};
+
+struct _queue {
+    node *head;     /* front */
+    node *tail;     /* rear  */
+};
+
+struct _node {
+    node *next;
+    void *data;
+};
+
+/**
+ * queue_new
+ */
+queue *
+queue_new (void);
+
+/**
+ * queue_free
+ */
+void
+queue_free (queue *q);
+
+/**
+ * queue_enqueue
+ */
+queue *
+queue_enqueue (queue *q, void  *data);
+
+/**
+ * queue_dequeue
+ */
+queue *
+queue_dequeue (queue *q, void **data);
+
+/**
+ * queue_is_empty
+ */
+bool
+queue_is_empty (queue *q);
+
+END_C_DECLS
 
 #endif

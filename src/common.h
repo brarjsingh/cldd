@@ -1,6 +1,7 @@
 #ifndef _CLDC_COMMON_H
 #define _CLDC_COMMON_H
 
+/* for mixing c and c++ */
 #ifdef __cplusplus
 #  define BEGIN_C_DECLS extern "C" {
 #  define END_C_DECLS   }
@@ -17,6 +18,8 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #if STDC_HEADERS
 #  include <stdio.h>
@@ -46,10 +49,9 @@
 #  include <tcpd.h>
 #endif
 
-#include <signal.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/un.h>
+#include <signal.h>
 #include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>

@@ -18,19 +18,22 @@ cldd_LDADD = \
 
 cldd_headers = \
 	common.h \
-	main.h \
+	cldd.h \
+	adt.h \
 	client.h \
 	conf.h \
 	daemon.h \
-	utils.h \
-	cldd_error.h
+	error.h \
+	utils.h
 
 cldd_SOURCES = \
 	$(cldd_headers) \
 	main.c \
+	adt.c \
 	client.c \
 	conf.c \
 	daemon.c \
+	error.c \
 	utils.c
 
 noinst_HEADERS =

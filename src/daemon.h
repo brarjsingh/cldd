@@ -18,20 +18,40 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef CLDD_DAEMON_H
-#define CLDD_DAEMON_H
+#ifndef _CLDD_DAEMON_H
+#define _CLDD_DAEMON_H
 
-#include "cldd_error.h"
+#include "common.h"
+
+BEGIN_C_DECLS
+
+#include "error.h"
 
 #include <stdbool.h>
 
+/**
+ * daemonize_init
+ *
+ * Setup user, group, and process lock file for daemon.
+ *
+ * @param user    The user to launch the daemon as
+ * @param group   The group to use for the daemon
+ * @param pidfile The pid lock file for the daemon process
+ */
 void
 daemonize_init (const char *user, const char *group, const char *pidfile);
 
+/**
+ * daemonize_finish
+ *
+ * Close the daemon and kill the process.
+ */
 void
 daemonize_finish (void);
 
 /**
+ * daemonize_kill
+ *
  * Kill the CLDD which is currently running, pid determined from the
  * pid file.
  */
@@ -39,21 +59,31 @@ void
 daemonize_kill (void);
 
 /**
+ * daemonize_close_stdin
+ *
  * Close stdin (fd 0) and re-open it as /dev/null.
  */
 void
 daemonize_close_stdin (void);
 
 /**
+ * daemonize_set_user
+ *
  * Change to the configured Unix user.
  */
 void
 daemonize_set_user (void);
 
 /**
+ * daemonize
+ *
  * Daemonize the server in either attached or detached mode.
+ *
+ * @param detach Whether or not to detach the server process
  */
 void
 daemonize (bool detach);
+
+END_C_DECLS
 
 #endif

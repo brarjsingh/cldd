@@ -10,7 +10,8 @@ AUTOMAKE_OPTIONS = foreign 1.10 dist-bzip2 subdir-objects
 #
 
 SUBDIRS = \
-	src
+	src \
+	tests
 
 #
 # Distribution

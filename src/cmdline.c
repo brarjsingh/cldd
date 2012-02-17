@@ -23,7 +23,7 @@
 #include "cmdline.h"
 #include "log.h"
 #include "conf.h"
-#include "cldd_error.h"
+#include "error.h"
 
 #define USER_CONFIG_FILE_LOCATION1    ".clddconf"
 #define USER_CONFIG_FILE_LOCATION2    ".cldd/cldd.conf"

@@ -18,7 +18,13 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef CLDD_CONF_H
-#define CLDD_CONF_H
+#ifndef _CLDD_CONF_H
+#define _CLDD_CONF_H
+
+#include "common.h"
+
+BEGIN_C_DECLS
+
+END_C_DECLS
 
 #endif

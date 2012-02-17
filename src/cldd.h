@@ -18,9 +18,33 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef CLDD_MAIN_H
-#define CLDD_MAIN_H
+#ifndef _CLDD_H
+#define _CLDD_H
 
-/* --- */
+#include "common.h"
+
+BEGIN_C_DECLS
+
+#include "adt.h"
+
+#define MAXLINE     4096        /* max text line length */
+
+/* this needs to be global for error functions */
+extern bool daemonized;
+
+typedef struct _client client;
+typedef struct _server server;
+
+struct _client {
+    int       cl_fd;
+    pthread_t cl_id;
+};
+
+struct _server {
+    int    port;
+    llist *client_list;
+};
+
+END_C_DECLS
 
 #endif
