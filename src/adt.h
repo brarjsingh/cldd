@@ -18,6 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file adt.h
+ * Function declarations for abstract data types used by CLDD.
+ */
+
 #ifndef _CLDD_ADT_H
 #define _CLDD_ADT_H
 
@@ -30,7 +35,7 @@ typedef struct _llist llist;
 typedef struct _queue queue;
 
 struct _llist {
-    node *next;
+    node *link;
 };
 
 struct _queue {
@@ -72,6 +77,44 @@ queue_dequeue (queue *q, void **data);
  */
 bool
 queue_is_empty (queue *q);
+
+/**
+ *
+ */
+llist *
+llist_new (void);
+
+/**
+ *
+ */
+void
+llist_free (llist *l);
+
+/**
+ *
+ */
+llist *
+llist_append (llist *l, void *data);
+
+/**
+ *
+ */
+llist *
+llist_remove (llist *l,
+              void *data,
+              bool (*compare_func)(const void*, const void*));
+
+/**
+ *
+ */
+int
+llist_length (llist *l);
+
+/**
+ *
+ */
+bool
+llist_is_empty (llist *l);
 
 END_C_DECLS
 

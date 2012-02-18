@@ -22,16 +22,20 @@
 
 #include "adt.h"
 
-queue * queue_new (void)
+/* -- queue -- */
+
+queue *
+queue_new (void)
 {
     queue *q = malloc (sizeof (queue));
-    if (q == NULL) ;
+    if (q == NULL)
         CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
     q->head = q->tail = NULL;
     return q;
 }
 
-void queue_free (queue *q)
+void
+queue_free (queue *q)
 {
     node *e;
     while (q->head)
@@ -39,7 +43,8 @@ void queue_free (queue *q)
     free (q);
 }
 
-queue * queue_enqueue (queue *q, void *data)
+queue *
+queue_enqueue (queue *q, void *data)
 {
     node *p = malloc (sizeof (node));
 
@@ -81,14 +86,14 @@ queue * queue_enqueue (queue *q, void *data)
     return q;
 }
 
-queue * queue_dequeue (queue *q, void **data)
+queue *
+queue_dequeue (queue *q, void **data)
 {
     node *p = NULL;
 
     if ((q == NULL) || (q->head == NULL && q->tail == NULL))
     {
         CLDD_MESSAGE("Queue is empty\n");
-        printf ("queue is empty\n");
         return q;
     }
     else if (q->head == NULL || q->tail == NULL)
@@ -111,4 +116,120 @@ queue * queue_dequeue (queue *q, void **data)
         q->tail = q->head;
 
     return q;
+}
+
+bool
+queue_is_empty (queue *q)
+{
+    if (q == NULL || (q->head == NULL && q->tail == NULL))
+        return true;
+    return false;
+}
+
+/* -- llist -- */
+
+llist *
+llist_new (void)
+{
+    llist *l = malloc (sizeof (llist));
+    if (l == NULL)
+        CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
+    l->link = NULL;
+    return l;
+}
+
+void
+llist_free (llist *l)
+{
+    while (l->link)
+    {
+        if (l->link->data != NULL)
+            free (l->link->data);       /* probably shouldn't do it this way */
+        free (l->link);
+    }
+    free (l);
+}
+
+llist *
+llist_append (llist *l, void *data)
+{
+    node *a = NULL;
+    node *b = NULL;
+
+    a = l->link;
+
+    if (l == NULL)
+        return l;
+
+    if (a == NULL)
+    {
+        a = malloc (sizeof (node));
+        a->data = data;
+        a->next = NULL;
+        l->link = a;
+    }
+    else
+    {
+        while (a->next != NULL)
+            a = a->next;
+
+        b = malloc (sizeof (node));
+        b->data = data;
+        b->next = NULL;
+        a->next = b;
+    }
+
+    return l;
+}
+
+llist *
+llist_remove (llist *l,
+              void *data,
+              bool (*compare_func)(const void*, const void*))
+{
+    if (l == NULL)
+        CLDD_MESSAGE("\n\nEmpty Linked List.Cant Delete The Data.");
+    else
+    {
+        node *old = NULL;
+        node *temp = NULL;
+
+        temp = l->link;
+        while (temp != NULL)
+        {
+            if (compare_func (temp->data, data))
+            {
+                if (temp == l->link)        /* first Node case */
+                    l->link = temp->next;   /* shift the header node */
+                else
+                    old->next = temp->next;
+                free (temp);
+                return l;
+            }
+            else
+            {
+                old = temp;
+                temp = temp->next;
+            }
+        }
+    }
+
+    return l;
+}
+
+int
+llist_length (llist *l)
+{
+    int n;
+    node *p = NULL;
+    for (n = 0, p = l->link; p; p = p->next, n++) ;
+    return n;
+}
+
+bool
+llist_is_empty (llist *l)
+{
+    if (l == NULL || l->link == NULL)
+        return true;
+    return false;
 }
