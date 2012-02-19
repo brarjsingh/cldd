@@ -25,24 +25,21 @@
 
 BEGIN_C_DECLS
 
-#include "adt.h"
+#include "cmdline.h"
 
 #define MAXLINE     4096        /* max text line length */
+#define BACKLOG     10
 
 /* this needs to be global for error functions */
-extern bool daemonized;
+extern struct options options;
 
 typedef struct _client client;
-typedef struct _server server;
 
 struct _client {
-    int       cl_fd;
-    pthread_t cl_id;
-};
-
-struct _server {
-    int    port;
-    llist *client_list;
+    int fd;
+    pthread_t tid;
+    struct sockaddr_in sa;
+    socklen_t sa_len;
 };
 
 END_C_DECLS

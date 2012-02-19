@@ -27,8 +27,6 @@ BEGIN_C_DECLS
 
 #include "error.h"
 
-#include <stdbool.h>
-
 /**
  * daemonize_init
  *

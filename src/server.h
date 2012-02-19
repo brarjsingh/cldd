@@ -18,38 +18,26 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef _CLDD_CMDLINE_H
-#define _CLDD_CMDLINE_H
+#ifndef _CLDD_SERVER_H
+#define _CLDD_SERVER_H
 
 #include "common.h"
 
 BEGIN_C_DECLS
 
-struct options {
-    bool kill;
-    bool daemon;
-    bool verbose;
+#include "adt.h"
+
+typedef struct _server server;
+
+struct _server {
+    int    port;
+    bool   running;
+    queue *spawn_queue;
+    llist *client_list;
 };
 
-/**
- * parse_cmdline
- *
- * Parses the command line arguments that were passed in at launch.
- *
- * @param argc    Number of command line arguments
- * @param argv    String list of arguments
- * @param options Structure to hold the results of getopt
- */
-bool
-parse_cmdline (int argc, char **argv, struct options *options);
-
-/**
- * usage
- *
- * Print the help/usage string for the daemon
- */
-void
-usage (char **argv);
+server * server_new (void);
+void server_free (server *s);
 
 END_C_DECLS
 

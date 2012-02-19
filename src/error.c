@@ -41,7 +41,7 @@ err_doit (int errnoflag, int level, const char *fmt, va_list ap)
         snprintf (buf + n, MAXLINE - n, ": %s", strerror(errno_save));
     strcat (buf, "\n");
 
-    if (daemonized) {
+    if (options.daemon) {
         syslog (level, buf);
     } else {
         fflush (stdout);     /* in case stdout and stderr are the same */

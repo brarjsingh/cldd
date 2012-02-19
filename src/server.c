@@ -18,39 +18,30 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef _CLDD_CMDLINE_H
-#define _CLDD_CMDLINE_H
+#include <common.h>
 
-#include "common.h"
+#include "cldd.h"
+#include "adt.h"
+#include "error.h"
+#include "server.h"
 
-BEGIN_C_DECLS
+server *
+server_new (void)
+{
+    server *s = malloc (sizeof (server));
+    if (s == NULL)
+        CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
 
-struct options {
-    bool kill;
-    bool daemon;
-    bool verbose;
-};
+    s->spawn_queue = queue_new ();
+    s->client_list = llist_new ();
 
-/**
- * parse_cmdline
- *
- * Parses the command line arguments that were passed in at launch.
- *
- * @param argc    Number of command line arguments
- * @param argv    String list of arguments
- * @param options Structure to hold the results of getopt
- */
-bool
-parse_cmdline (int argc, char **argv, struct options *options);
+    return s;
+}
 
-/**
- * usage
- *
- * Print the help/usage string for the daemon
- */
 void
-usage (char **argv);
-
-END_C_DECLS
-
-#endif
+server_free (server *s)
+{
+    queue_free (s->spawn_queue);
+    llist_free (s->client_list);
+    free (s);
+}

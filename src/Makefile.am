@@ -21,9 +21,11 @@ cldd_headers = \
 	cldd.h \
 	adt.h \
 	client.h \
+	cmdline.h \
 	conf.h \
 	daemon.h \
 	error.h \
+	server.h \
 	utils.h
 
 cldd_SOURCES = \
@@ -31,9 +33,11 @@ cldd_SOURCES = \
 	main.c \
 	adt.c \
 	client.c \
+	cmdline.c \
 	conf.c \
 	daemon.c \
 	error.c \
+	server.c \
 	utils.c
 
 noinst_HEADERS =

@@ -22,28 +22,44 @@
 
 #include "cldd.h"
 #include "client.h"
+#include "cmdline.h"
 #include "conf.h"
 #include "daemon.h"
-#include "utils.h"
 #include "error.h"
+#include "server.h"
+#include "utils.h"
 
 /* replace later with value taken from configuration file */
 #define PID_FILE    "/var/run/cldd.pid"
 
 /* function prototypes */
-void usage (void);
 void signal_handler (int sig);
-void *client_manager (void *data);
-void *str_echo (void *arg);
-ssize_t writen (int fd, const void *vptr, size_t n);
-ssize_t readline (int fd, void *vptr, size_t maxlen);
+void * client_manager (void *data);
+void * client_thread (void *data);
 
 pthread_t master_thread;
-bool daemonized = false;
+struct options options;
 
-int main (int argc, char *argv[])
+static void
+glue_daemonize_init (const struct options *options)
+{
+    daemonize_init ("root", "root", PID_FILE);
+    if (options->kill)
+        daemonize_kill ();
+}
+
+int
+main (int argc, char **argv)
 {
     int ret;
+    bool success;
+    server *s;
+
+    if (argc == 1)
+        usage (argv);
+    success = parse_cmdline (argc, argv, &options);
+    if (!success)
+        CLDD_ERROR ("Error while parsing command line arguments\n");
 
     /* setup signal handling first */
     signal (SIGHUP,  signal_handler);
@@ -51,20 +67,23 @@ int main (int argc, char *argv[])
     signal (SIGTERM, signal_handler);
     signal (SIGQUIT, signal_handler);
 
+    /* allocate memory for server data */
+    s = server_new ();
+    s->port = 8000;         /* port for client connections - read from cmdline later */
+
     daemonize_close_stdin ();
 
-    daemonize_init ("root", "root", PID_FILE);
-    //glue_daemonize_init (&options);
+    glue_daemonize_init (&options);
     //log_init (options.verbose, options.log_stderr);
 
     daemonize_set_user ();
 
-    /* true starts daemon in detached mode */
-    daemonize (true);
+    /* passing true starts daemon in detached mode */
+    daemonize (options.daemon);
     //setup_log_output (options.log_stderr);
 
     /* start the master thread for client management */
-    ret = pthread_create (&master_thread, NULL, client_manager, NULL);
+    ret = pthread_create (&master_thread, NULL, client_manager, s);
     if (ret != 0)
         CLDD_ERROR("Unable to create client management thread");
     pthread_join (master_thread, NULL);
@@ -72,16 +91,10 @@ int main (int argc, char *argv[])
     daemonize_finish ();
     //close_log_files ();
 
-    return EXIT_SUCCESS;
-}
+    /* clean up */
+    server_free (s);
 
-/**
- * usage
- *
- * Print the correct usage for launching the daemon, or the help.
- */
-void usage (void)
-{
+    return EXIT_SUCCESS;
 }
 
 /**
@@ -92,7 +105,8 @@ void usage (void)
  *
  * @param sig The signal received
  */
-void signal_handler (int sig)
+void
+signal_handler (int sig)
 {
     /* do something useful here later */
     switch (sig)
@@ -119,147 +133,106 @@ void signal_handler (int sig)
  *
  * @param data Thread data for the function
  */
-void *client_manager (void *data)
+void *
+client_manager (void *data)
 {
-    int listenfd, connfd;
-    socklen_t clilen;
-    struct sockaddr_in cliaddr, servaddr;
+    int listenfd, udpfd;
+    const int on = 1;
+    struct sockaddr_in servaddr;
 
-//    server *s = (server)data;
+    server *s = (server *)data;
 
-    /* setup the socket to listen for client connections */
+    /* create TCP socket to listen for client connections */
+    CLDD_MESSAGE("Creating TCP socket");
     listenfd = socket (AF_INET, SOCK_STREAM, 0);
 
     bzero (&servaddr, sizeof (servaddr));
     servaddr.sin_family      = AF_INET;
     servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
-//    servaddr.sin_port        = htons (s->port);
-    servaddr.sin_port        = htons (8000);
+    servaddr.sin_port        = htons (s->port);
 
+    setsockopt (listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on));
     bind (listenfd, (struct sockaddr *) &servaddr, sizeof (servaddr));
-    listen (listenfd, 5);
+    listen (listenfd, BACKLOG);
+
+    /* create UDP socket for clients */
+//    CLDD_MESSAGE("Creating UDP socket");
+//    udpfd = socket (AF_INET, SOCK_DGRAM, 0);
+
+//    bzero (&servaddr, sizeof (servaddr));
+//    servaddr.sin_family      = AF_INET;
+//    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
+//    servaddr.sin_port        = htons (s->port);
+
+//    bind (udpfd, (struct sockaddr *) &servaddr, sizeof (servaddr));
 
     for (;;)
     {
-        pthread_t client;
+        client *c = malloc (sizeof (client));
 
-        clilen = sizeof (cliaddr);
+        c->sa_len = sizeof (c->sa);
         /* blocking call waiting for connections */
-        connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
-        CLDD_MESSAGE("Received connection from (%s , %d)\n",
-                     inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+        CLDD_MESSAGE("Waiting for new connection");
+        c->fd = accept (listenfd, (struct sockaddr *) &c->sa, &c->sa_len);
+        CLDD_MESSAGE("Received connection from (%s , %d)",
+                     inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
 
         /* launch the thread for the client */
-        pthread_create (&client, NULL, str_echo, &connfd);
+        CLDD_MESSAGE("Creating client thread");
+        pthread_create (&c->tid, NULL, client_thread, c);
+        CLDD_MESSAGE("Done with thread create");
     }
 
     pthread_exit (NULL);
 }
 
 /**
- * str_echo
+ * client_thread
  *
  * Function to test client connections.
  *
  * @param sockfd The socket of the client
  **/
-void *str_echo (void *arg)
+void *
+client_thread (void *data)
 {
-    long arg1, arg2;
     ssize_t n;
-    char line[MAXLINE];
+    char *recv;
+    char send[MAXLINE] = "random text to use for testing write to client\n";
+//    socklen_t len;
+    client *c = (client *)data;
 
-    int sockfd = (int)arg;
+    recv = malloc (MAXLINE * sizeof (char));
 
+    CLDD_MESSAGE("Entering client loop - sock fd = %d", c->fd);
     for (;;)
     {
-        if ((n = readline (sockfd, line, MAXLINE)) == 0)
-            return;
+//        len = c->sa_len;
+//        n = recvfrom (c->fd, recv, MAXLINE, 0, (struct sockaddr *) &c->sa, &len);
+//        recv[n] = '\0';
 
-        if (sscanf (line, "%ld%ld", &arg1, &arg2) == 2)
-            snprintf (line, sizeof (line), "%ld\n", arg1 + arg2);
-        else
-            snprintf (line, sizeof (line), "input error\n");
+//        CLDD_MESSAGE ("Read %d chars on sock fd %d: %s", n, c->fd, recv);
+//        if (strcmp (recv, "request\n") == 0)
+//            sendto (c->fd, send, strlen (send), 0, (struct sockaddr *) &c->sa, c->sa_len);
+//        else if (strcmp (recv, "quit\n") == 0)
+//            break;
 
-        n = strlen (line);
-        if (writen (sockfd, line, n) != n)
-            CLDD_ERROR("Write error");
-    }
-}
+        /* blocking call to wait for client request */
+        n = readline (c->fd, recv, MAXLINE);
+        if (n == 0)
+            break;
 
-/**
- * writen
- *
- * Write n bytes to a descriptor. Taken from Stevens UNP.
- */
-ssize_t writen (int fd, const void *vptr, size_t n)
-{
-    size_t nleft;
-    ssize_t nwritten;
-    const char *ptr;
-
-    ptr = vptr;
-    nleft = n;
-    while (nleft > 0)
-    {
-        if ((nwritten = write (fd, ptr, nleft)) <= 0)
+        CLDD_MESSAGE ("Read %d chars on sock fd %d: %s", n, c->fd, recv);
+        if (strcmp (recv, "request\n") == 0)
         {
-            if (nwritten < 0 && errno == EINTR)
-                nwritten = 0;
-            else
-                return -1;
-
-            nleft -= nwritten;
-            ptr   += nwritten;
+            if ((n = writen (c->fd, send, strlen (send))) != strlen (send))
+                CLDD_MESSAGE("Client write error - %d != %d", strlen (send), n);
         }
+        else if (strcmp (recv, "quit\n") == 0)
+            break;
     }
+    CLDD_MESSAGE("Leaving client loop");
 
-    return n;
-}
-
-static int  read_cnt;
-static char *read_ptr;
-static char read_buf[MAXLINE];
-
-static ssize_t
-my_read (int fd, char *ptr)
-{
-
-    if (read_cnt <= 0) {
-again:
-        if ( (read_cnt = read(fd, read_buf, sizeof(read_buf))) < 0) {
-            if (errno == EINTR)
-                goto again;
-            return(-1);
-        } else if (read_cnt == 0)
-            return(0);
-        read_ptr = read_buf;
-    }
-
-    read_cnt--;
-    *ptr = *read_ptr++;
-    return(1);
-}
-
-ssize_t
-readline (int fd, void *vptr, size_t maxlen)
-{
-    ssize_t n, rc;
-    char    c, *ptr;
-
-    ptr = vptr;
-    for (n = 1; n < maxlen; n++) {
-        if ( (rc = my_read(fd, &c)) == 1) {
-            *ptr++ = c;
-            if (c == '\n')
-                break;  /* newline is stored, like fgets() */
-        } else if (rc == 0) {
-            *ptr = 0;
-            return(n - 1);  /* EOF, n - 1 bytes were read */
-        } else
-            return(-1);     /* error, errno set by read() */
-    }
-
-    *ptr = 0;   /* null terminate like fgets() */
-    return(n);
+    free (recv);
+    pthread_exit (NULL);
 }

@@ -21,6 +21,7 @@
 #include <common.h>
 
 #include "adt.h"
+#include "error.h"
 
 /* -- queue -- */
 
@@ -50,7 +51,7 @@ queue_enqueue (queue *q, void *data)
 
     if (p == NULL)
     {
-        CLDD_MESSAGE("In %s, %s: malloc() failed\n", __FILE__, "queue_enq");
+        CLDD_MESSAGE("In %s, %s: malloc() failed\n", __FILE__, "queue_enqueue");
         return NULL;
     }
 
@@ -188,7 +189,7 @@ llist_remove (llist *l,
               bool (*compare_func)(const void*, const void*))
 {
     if (l == NULL)
-        CLDD_MESSAGE("\n\nEmpty Linked List.Cant Delete The Data.");
+        CLDD_MESSAGE("Empty list, can't delete data");
     else
     {
         node *old = NULL;

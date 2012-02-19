@@ -163,10 +163,6 @@ daemonize (bool detach)
 {
     FILE *fp = NULL;
 
-    /* stdout/err is already closed by this point so we should
-     * be using syslog for errors */
-    daemonized = true;
-
     if (pidfile != NULL)
     {
         /* do this before daemon'izing so we can fail gracefully if we can't
