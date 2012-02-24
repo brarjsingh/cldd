@@ -26,6 +26,7 @@
 BEGIN_C_DECLS
 
 struct options {
+    int  port;
     bool kill;
     bool daemon;
     bool verbose;

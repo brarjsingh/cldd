@@ -40,7 +40,7 @@ queue_free (queue *q)
 {
     node *e;
     while (q->head)
-        q = queue_dequeue (q, e);
+        q = queue_dequeue (q, (void **)&e);
     free (q);
 }
 
@@ -125,6 +125,15 @@ queue_is_empty (queue *q)
     if (q == NULL || (q->head == NULL && q->tail == NULL))
         return true;
     return false;
+}
+
+int
+queue_size (queue *q)
+{
+    int i = 0;
+    while (q->head)
+        i++;
+    return i;
 }
 
 /* -- llist -- */

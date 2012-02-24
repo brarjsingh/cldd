@@ -32,8 +32,24 @@ server_new (void)
     if (s == NULL)
         CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
 
+    /* create the collections for client management */
     s->spawn_queue = queue_new ();
     s->client_list = llist_new ();
+
+    /* create the mutexes for controlling access to thread data */
+    if ((pthread_mutex_init (&s->spawn_queue_lock, NULL) != 0) ||
+        (pthread_mutex_init (&s->client_list_lock, NULL) != 0))
+    {
+        free (s);
+        return NULL;
+    }
+
+    /* create condition variables for controlling thread synchronization */
+    if (pthread_cond_init (&s->spawn_queue_ready, NULL) != 0)
+    {
+        free (s);
+        return NULL;
+    }
 
     return s;
 }
@@ -41,7 +57,17 @@ server_new (void)
 void
 server_free (server *s)
 {
+    /* clear the data for the collections */
     queue_free (s->spawn_queue);
-    llist_free (s->client_list);
+    //llist_free (s->client_list);      /* not necessary - I think */
+
+    /* destroy the locks */
+    pthread_mutex_destroy (&s->spawn_queue_lock);
+    pthread_mutex_destroy (&s->client_list_lock);
+
+    /* destroy the condition variable */
+    pthread_cond_destroy (&s->spawn_queue_ready);
+
+    /* finally clean up the server allocation */
     free (s);
 }

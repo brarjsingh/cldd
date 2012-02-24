@@ -30,10 +30,18 @@ BEGIN_C_DECLS
 typedef struct _server server;
 
 struct _server {
+    int    fd;
     int    port;
     bool   running;
+    /* client management */
     queue *spawn_queue;
     llist *client_list;
+    /* data for threading */
+    pthread_t client_spawn_tid;
+    pthread_t client_queue_tid;
+    pthread_mutex_t spawn_queue_lock;
+    pthread_mutex_t client_list_lock;
+    pthread_cond_t spawn_queue_ready;
 };
 
 server * server_new (void);

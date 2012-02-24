@@ -36,8 +36,12 @@
 void signal_handler (int sig);
 void * client_manager (void *data);
 void * client_thread (void *data);
+void * client_spawn_handler (void *data);
+void * client_queue_handler (void *data);
 
 pthread_t master_thread;
+pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
+
 struct options options;
 
 static void
@@ -59,7 +63,7 @@ main (int argc, char **argv)
         usage (argv);
     success = parse_cmdline (argc, argv, &options);
     if (!success)
-        CLDD_ERROR ("Error while parsing command line arguments\n");
+        CLDD_ERROR("Error while parsing command line arguments\n");
 
     /* setup signal handling first */
     signal (SIGHUP,  signal_handler);
@@ -69,7 +73,7 @@ main (int argc, char **argv)
 
     /* allocate memory for server data */
     s = server_new ();
-    s->port = 8000;         /* port for client connections - read from cmdline later */
+    s->port = options.port;
 
     daemonize_close_stdin ();
 
@@ -136,7 +140,7 @@ signal_handler (int sig)
 void *
 client_manager (void *data)
 {
-    int listenfd, udpfd;
+    int ret;
     const int on = 1;
     struct sockaddr_in servaddr;
 
@@ -144,44 +148,34 @@ client_manager (void *data)
 
     /* create TCP socket to listen for client connections */
     CLDD_MESSAGE("Creating TCP socket");
-    listenfd = socket (AF_INET, SOCK_STREAM, 0);
+    s->fd = socket (AF_INET, SOCK_STREAM, 0);
+    setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (int));
 
     bzero (&servaddr, sizeof (servaddr));
     servaddr.sin_family      = AF_INET;
     servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
     servaddr.sin_port        = htons (s->port);
 
-    setsockopt (listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on));
-    bind (listenfd, (struct sockaddr *) &servaddr, sizeof (servaddr));
-    listen (listenfd, BACKLOG);
+    if (bind (s->fd, (struct sockaddr *) &servaddr, sizeof (servaddr)) < 0)
+        CLDD_ERROR("Failed to bind socket %ld", s->fd);
+    if (listen (s->fd, BACKLOG) < 0)
+        CLDD_ERROR("Unable to listen on socket %ld", s->fd);
 
-    /* create UDP socket for clients */
-//    CLDD_MESSAGE("Creating UDP socket");
-//    udpfd = socket (AF_INET, SOCK_DGRAM, 0);
+    /* create the thread that monitors client requests */
+    ret = pthread_create (&s->client_queue_tid, NULL, client_queue_handler, s);
+    if (ret != 0)
+        CLDD_ERROR("Failed to create thread to manage client queue requests");
 
-//    bzero (&servaddr, sizeof (servaddr));
-//    servaddr.sin_family      = AF_INET;
-//    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
-//    servaddr.sin_port        = htons (s->port);
+    /* create the thread that spawns client connections */
+    ret = pthread_create (&s->client_spawn_tid, NULL, client_spawn_handler, s);
+    if (ret != 0)
+        CLDD_ERROR("Failed to create thread that spawns client connections");
 
-//    bind (udpfd, (struct sockaddr *) &servaddr, sizeof (servaddr));
+    /* wait for the control threads to finish */
+    pthread_join (s->client_queue_tid, NULL);
+    pthread_join (s->client_spawn_tid, NULL);
 
-    for (;;)
-    {
-        client *c = malloc (sizeof (client));
-
-        c->sa_len = sizeof (c->sa);
-        /* blocking call waiting for connections */
-        CLDD_MESSAGE("Waiting for new connection");
-        c->fd = accept (listenfd, (struct sockaddr *) &c->sa, &c->sa_len);
-        CLDD_MESSAGE("Received connection from (%s , %d)",
-                     inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
-
-        /* launch the thread for the client */
-        CLDD_MESSAGE("Creating client thread");
-        pthread_create (&c->tid, NULL, client_thread, c);
-        CLDD_MESSAGE("Done with thread create");
-    }
+    CLDD_MESSAGE("Exiting the client manager");
 
     pthread_exit (NULL);
 }
@@ -199,7 +193,6 @@ client_thread (void *data)
     ssize_t n;
     char *recv;
     char send[MAXLINE] = "random text to use for testing write to client\n";
-//    socklen_t len;
     client *c = (client *)data;
 
     recv = malloc (MAXLINE * sizeof (char));
@@ -207,32 +200,112 @@ client_thread (void *data)
     CLDD_MESSAGE("Entering client loop - sock fd = %d", c->fd);
     for (;;)
     {
-//        len = c->sa_len;
-//        n = recvfrom (c->fd, recv, MAXLINE, 0, (struct sockaddr *) &c->sa, &len);
-//        recv[n] = '\0';
+        /* I hate to do this but without a delay the single thread
+         * runs uninterrupted eliminating any traffic concurrency */
+        usleep (1000);
 
-//        CLDD_MESSAGE ("Read %d chars on sock fd %d: %s", n, c->fd, recv);
-//        if (strcmp (recv, "request\n") == 0)
-//            sendto (c->fd, send, strlen (send), 0, (struct sockaddr *) &c->sa, c->sa_len);
-//        else if (strcmp (recv, "quit\n") == 0)
-//            break;
-
+        pthread_mutex_lock (&master_lock);
         /* blocking call to wait for client request */
         n = readline (c->fd, recv, MAXLINE);
         if (n == 0)
             break;
 
-        CLDD_MESSAGE ("Read %d chars on sock fd %d: %s", n, c->fd, recv);
+        CLDD_MESSAGE("Read %d chars on sock fd %d: %s", n, c->fd, recv);
         if (strcmp (recv, "request\n") == 0)
         {
             if ((n = writen (c->fd, send, strlen (send))) != strlen (send))
                 CLDD_MESSAGE("Client write error - %d != %d", strlen (send), n);
+            pthread_mutex_unlock (&master_lock);
         }
         else if (strcmp (recv, "quit\n") == 0)
+        {
+            pthread_mutex_unlock (&master_lock);
             break;
+        }
     }
     CLDD_MESSAGE("Leaving client loop");
 
+    close (c->fd);
+
     free (recv);
+    pthread_exit (NULL);
+}
+
+/**
+ * monitor the client request queue and spawn client threads as necessary
+ */
+void *
+client_spawn_handler (void *data)
+{
+    server *s = (server *)data;
+    client *c = NULL;
+
+    for (;;)
+    {
+        usleep (1000);
+
+        pthread_mutex_lock (&s->spawn_queue_lock);
+
+        CLDD_MESSAGE("Spawning clients");
+        /* if any client requests were made spawn a new thread */
+        while (queue_is_empty (s->spawn_queue))
+            pthread_cond_wait (&s->spawn_queue_ready, &s->spawn_queue_lock);
+
+        /* pop the next node in the queue */
+        s->spawn_queue = queue_dequeue (s->spawn_queue, (void **)&c);
+        pthread_mutex_unlock (&s->spawn_queue_lock);
+
+        /* launch the thread for the client */
+        pthread_create (&c->tid, NULL, client_thread, c);
+        CLDD_MESSAGE("Create client thread %ld", c->tid);
+        //usleep (1000);
+        //pthread_mutex_lock (&s->client_list_lock);
+        //s->client_list = llist_append (s->client_list, (void *)c);
+        //CLDD_MESSAGE("Added client to list, new size: %d", llist_length (s->client_list));
+        //pthread_mutex_unlock (&s->client_list_lock);
+    }
+
+    pthread_exit (NULL);
+}
+
+/**
+ * wait for new client connection requests
+ */
+void *
+client_queue_handler (void *data)
+{
+    server *s = (server *)data;
+    client *c = NULL;
+
+    for (;;)
+    {
+        usleep (1000);
+
+        /* get the client data ready */
+        c = client_new ();
+        c->sa_len = sizeof (c->sa);
+
+        /* blocking call waiting for connections */
+        CLDD_MESSAGE("Waiting for a new client connection");
+        c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
+        //set_nonblocking (c->fd);
+        CLDD_MESSAGE("Received connection from (%s, %d)",
+                     inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
+
+        /* queue up the new connection */
+        pthread_mutex_lock (&s->spawn_queue_lock);
+        s->spawn_queue = queue_enqueue (s->spawn_queue, (void *)c);
+        pthread_mutex_unlock (&s->spawn_queue_lock);
+        pthread_cond_signal (&s->spawn_queue_ready);
+        //CLDD_MESSAGE("Enqueued client request");
+
+//        if (queue_is_empty (s->spawn_queue))
+//            CLDD_MESSAGE("Failed to add client to queue");
+//        else
+//            CLDD_MESSAGE("New queue size is %d", queue_size (s->spawn_queue));
+
+        c = NULL;
+    }
+
     pthread_exit (NULL);
 }

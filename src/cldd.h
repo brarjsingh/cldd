@@ -28,19 +28,10 @@ BEGIN_C_DECLS
 #include "cmdline.h"
 
 #define MAXLINE     4096        /* max text line length */
-#define BACKLOG     10
+#define BACKLOG     1024
 
 /* this needs to be global for error functions */
 extern struct options options;
-
-typedef struct _client client;
-
-struct _client {
-    int fd;
-    pthread_t tid;
-    struct sockaddr_in sa;
-    socklen_t sa_len;
-};
 
 END_C_DECLS
 

@@ -25,6 +25,19 @@
 
 BEGIN_C_DECLS
 
+typedef struct _client client;
+
+struct _client {
+    int fd;
+    pthread_t tid;
+    struct sockaddr_in sa;
+    socklen_t sa_len;
+};
+
+client * client_new (void);
+bool client_compare (const void * _a, const void * _b);
+void client_free (void *c);
+
 END_C_DECLS
 
 #endif

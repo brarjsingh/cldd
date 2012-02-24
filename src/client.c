@@ -21,3 +21,28 @@
 #include <common.h>
 
 #include "client.h"
+
+client *
+client_new (void)
+{
+    client *c = malloc (sizeof (client));
+    return c;
+}
+
+bool
+client_compare (const void * _a, const void * _b)
+{
+    const client *a = (const client *) _a;
+    const client *b = (const client *) _b;
+
+    if (a->fd == b->fd)
+        return true;
+    else
+        return false;
+}
+
+void
+client_free (void *c)
+{
+    free (c);
+}

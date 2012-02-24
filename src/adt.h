@@ -79,6 +79,12 @@ bool
 queue_is_empty (queue *q);
 
 /**
+ * queue_size
+ */
+int
+queue_size (queue *q);
+
+/**
  *
  */
 llist *
