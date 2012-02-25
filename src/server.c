@@ -32,6 +32,8 @@ server_new (void)
     if (s == NULL)
         CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
 
+    s->n_clients = 0;
+
     /* create the collections for client management */
     s->spawn_queue = queue_new ();
     s->client_list = llist_new ();
@@ -59,7 +61,7 @@ server_free (server *s)
 {
     /* clear the data for the collections */
     queue_free (s->spawn_queue);
-    //llist_free (s->client_list);      /* not necessary - I think */
+    llist_free (s->client_list);
 
     /* destroy the locks */
     pthread_mutex_destroy (&s->spawn_queue_lock);
@@ -67,6 +69,9 @@ server_free (server *s)
 
     /* destroy the condition variable */
     pthread_cond_destroy (&s->spawn_queue_ready);
+
+    /* string should be guaranteed to contain a value */
+    free (s->log_filename);
 
     /* finally clean up the server allocation */
     free (s);

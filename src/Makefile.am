@@ -25,6 +25,7 @@ cldd_headers = \
 	conf.h \
 	daemon.h \
 	error.h \
+	log.h \
 	server.h \
 	utils.h
 
@@ -37,6 +38,7 @@ cldd_SOURCES = \
 	conf.c \
 	daemon.c \
 	error.c \
+	log.c \
 	server.c \
 	utils.c
 

@@ -20,6 +20,8 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #if STDC_HEADERS
 #  include <stdio.h>

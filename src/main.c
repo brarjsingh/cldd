@@ -26,16 +26,22 @@
 #include "conf.h"
 #include "daemon.h"
 #include "error.h"
+#include "log.h"
 #include "server.h"
 #include "utils.h"
 
 /* replace later with value taken from configuration file */
 #define PID_FILE    "/var/run/cldd.pid"
 
+struct client_data_t {
+    server *s;
+    client *c;
+};
+
 /* function prototypes */
 void signal_handler (int sig);
 void * client_manager (void *data);
-void * client_thread (void *data);
+void * client_func (void *data);
 void * client_spawn_handler (void *data);
 void * client_queue_handler (void *data);
 
@@ -78,13 +84,13 @@ main (int argc, char **argv)
     daemonize_close_stdin ();
 
     glue_daemonize_init (&options);
-    //log_init (options.verbose, options.log_stderr);
+    log_init (s, &options);
 
     daemonize_set_user ();
 
     /* passing true starts daemon in detached mode */
     daemonize (options.daemon);
-    //setup_log_output (options.log_stderr);
+    setup_log_output (s);
 
     /* start the master thread for client management */
     ret = pthread_create (&master_thread, NULL, client_manager, s);
@@ -93,7 +99,7 @@ main (int argc, char **argv)
     pthread_join (master_thread, NULL);
 
     daemonize_finish ();
-    //close_log_files ();
+    close_log_files (s);
 
     /* clean up */
     server_free (s);
@@ -181,19 +187,20 @@ client_manager (void *data)
 }
 
 /**
- * client_thread
+ * client_func
  *
  * Function to test client connections.
  *
  * @param sockfd The socket of the client
  **/
 void *
-client_thread (void *data)
+client_func (void *data)
 {
     ssize_t n;
     char *recv;
     char send[MAXLINE] = "random text to use for testing write to client\n";
-    client *c = (client *)data;
+    client *c = (client *)((struct client_data_t *)data)->c;
+    server *s = (server *)((struct client_data_t *)data)->s;
 
     recv = malloc (MAXLINE * sizeof (char));
 
@@ -210,7 +217,7 @@ client_thread (void *data)
         if (n == 0)
             break;
 
-        CLDD_MESSAGE("Read %d chars on sock fd %d: %s", n, c->fd, recv);
+        //CLDD_MESSAGE("Read %d chars on sock fd %d: %s", n, c->fd, recv);
         if (strcmp (recv, "request\n") == 0)
         {
             if ((n = writen (c->fd, send, strlen (send))) != strlen (send))
@@ -225,7 +232,11 @@ client_thread (void *data)
     }
     CLDD_MESSAGE("Leaving client loop");
 
+    s->n_clients--;
     close (c->fd);
+    llist_remove (s->client_list, (void *)c, client_compare);
+    client_free (c);
+    c = NULL;
 
     free (recv);
     pthread_exit (NULL);
@@ -239,6 +250,8 @@ client_spawn_handler (void *data)
 {
     server *s = (server *)data;
     client *c = NULL;
+    struct client_data_t cd;
+    struct client_data_t *pcd;
 
     for (;;)
     {
@@ -256,13 +269,19 @@ client_spawn_handler (void *data)
         pthread_mutex_unlock (&s->spawn_queue_lock);
 
         /* launch the thread for the client */
-        pthread_create (&c->tid, NULL, client_thread, c);
+        s->n_clients++;
+        //cd = malloc (sizeof (struct client_data_t));
+        cd.s = s;
+        cd.c = c;
+        pcd = &cd;
+        pthread_create (&c->tid, NULL, client_func, pcd);
         CLDD_MESSAGE("Create client thread %ld", c->tid);
+
         //usleep (1000);
-        //pthread_mutex_lock (&s->client_list_lock);
-        //s->client_list = llist_append (s->client_list, (void *)c);
-        //CLDD_MESSAGE("Added client to list, new size: %d", llist_length (s->client_list));
-        //pthread_mutex_unlock (&s->client_list_lock);
+        pthread_mutex_lock (&s->client_list_lock);
+        s->client_list = llist_append (s->client_list, (void *)c);
+        CLDD_MESSAGE("Added client to list, new size: %d", llist_length (s->client_list));
+        pthread_mutex_unlock (&s->client_list_lock);
     }
 
     pthread_exit (NULL);

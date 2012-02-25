@@ -30,9 +30,10 @@ BEGIN_C_DECLS
 typedef struct _server server;
 
 struct _server {
-    int    fd;
-    int    port;
-    bool   running;
+    int fd;
+    int port;
+    int n_clients;
+    bool running;
     /* client management */
     queue *spawn_queue;
     llist *client_list;
@@ -42,6 +43,10 @@ struct _server {
     pthread_mutex_t spawn_queue_lock;
     pthread_mutex_t client_list_lock;
     pthread_cond_t spawn_queue_ready;
+    /* performance logging */
+    bool logging;
+    FILE *logfp;
+    char *log_filename;
 };
 
 server * server_new (void);

@@ -44,5 +44,6 @@ client_compare (const void * _a, const void * _b)
 void
 client_free (void *c)
 {
-    free (c);
+    client *_c = (client *)c;
+    free (_c);
 }
