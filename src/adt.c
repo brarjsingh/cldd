@@ -131,8 +131,26 @@ int
 queue_size (queue *q)
 {
     int i = 0;
-    while (q->head)
+    node *p = NULL;
+
+    if ((q == NULL) || (q->head == NULL && q->tail == NULL))
+    {
+        CLDD_MESSAGE("Queue is empty\n");
+        return q;
+    }
+    else if (q->head == NULL || q->tail == NULL)
+    {
+        CLDD_MESSAGE("There is something wrong with the queue\n"
+                     "One of the head/tail is empty while other is not\n");
+        return q;
+    }
+
+    p = q->head;
+    while (p)
+    {
         i++;
+        p = p->next;
+    }
     return i;
 }
 

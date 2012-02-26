@@ -232,9 +232,11 @@ client_func (void *data)
     }
     CLDD_MESSAGE("Leaving client loop");
 
+    pthread_mutex_lock (&s->server_data_lock);
     s->n_clients--;
-    close (c->fd);
     llist_remove (s->client_list, (void *)c, client_compare);
+    pthread_mutex_unlock (&s->server_data_lock);
+    close (c->fd);
     client_free (c);
     c = NULL;
 
@@ -269,19 +271,22 @@ client_spawn_handler (void *data)
         pthread_mutex_unlock (&s->spawn_queue_lock);
 
         /* launch the thread for the client */
+        pthread_mutex_lock (&s->server_data_lock);
         s->n_clients++;
-        //cd = malloc (sizeof (struct client_data_t));
+        s->n_max_connected = (s->n_clients > s->n_max_connected)
+                             ? s->n_clients : s->n_max_connected;
+        pthread_mutex_unlock (&s->server_data_lock);
         cd.s = s;
         cd.c = c;
         pcd = &cd;
         pthread_create (&c->tid, NULL, client_func, pcd);
         CLDD_MESSAGE("Create client thread %ld", c->tid);
 
-        //usleep (1000);
-        pthread_mutex_lock (&s->client_list_lock);
+        pthread_mutex_lock (&s->server_data_lock);
         s->client_list = llist_append (s->client_list, (void *)c);
-        CLDD_MESSAGE("Added client to list, new size: %d", llist_length (s->client_list));
-        pthread_mutex_unlock (&s->client_list_lock);
+        CLDD_MESSAGE("Added client to list, new size: %d",
+                     llist_length (s->client_list));
+        pthread_mutex_unlock (&s->server_data_lock);
     }
 
     pthread_exit (NULL);
@@ -307,7 +312,6 @@ client_queue_handler (void *data)
         /* blocking call waiting for connections */
         CLDD_MESSAGE("Waiting for a new client connection");
         c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
-        //set_nonblocking (c->fd);
         CLDD_MESSAGE("Received connection from (%s, %d)",
                      inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
 
@@ -315,13 +319,9 @@ client_queue_handler (void *data)
         pthread_mutex_lock (&s->spawn_queue_lock);
         s->spawn_queue = queue_enqueue (s->spawn_queue, (void *)c);
         pthread_mutex_unlock (&s->spawn_queue_lock);
-        pthread_cond_signal (&s->spawn_queue_ready);
-        //CLDD_MESSAGE("Enqueued client request");
-
-//        if (queue_is_empty (s->spawn_queue))
-//            CLDD_MESSAGE("Failed to add client to queue");
-//        else
-//            CLDD_MESSAGE("New queue size is %d", queue_size (s->spawn_queue));
+        /* don't need to signal if a queue exists */
+        if (queue_size (s->spawn_queue) == 1)
+            pthread_cond_signal (&s->spawn_queue_ready);
 
         c = NULL;
     }

@@ -18,40 +18,29 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef _CLDD_SERVER_H
-#define _CLDD_SERVER_H
+#ifndef _CLDD_LOG_H
+#define _CLDD_LOG_H
 
 #include "common.h"
 
 BEGIN_C_DECLS
 
-#include "adt.h"
+#include "cmdline.h"
+#include "server.h"
 
-typedef struct _server server;
+extern pthread_t       logging_thread;
+extern pthread_cond_t  log_timer_cond;
+extern pthread_mutex_t log_timer_mutex;
 
-struct _server {
-    int fd;
-    int port;
-    int n_clients;
-    int n_max_connected;
-    bool running;
-    /* client management */
-    queue *spawn_queue;
-    llist *client_list;
-    /* data for threading */
-    pthread_t client_spawn_tid;
-    pthread_t client_queue_tid;
-    pthread_mutex_t server_data_lock;
-    pthread_mutex_t spawn_queue_lock;
-    pthread_cond_t spawn_queue_ready;
-    /* performance logging */
-    bool logging;
-    FILE *logfp;
-    char *log_filename;
-};
+/* these are going to seem unnecessary at first,
+ * they are intended for later development */
 
-server * server_new (void);
-void server_free (server *s);
+/* TODO: create struct log and replace server in function parameters */
+
+void log_init (server *s, struct options *options);
+void setup_log_output (server *s);
+void close_log_files (server *s);
+void * logging_func (void *data);
 
 END_C_DECLS
 
