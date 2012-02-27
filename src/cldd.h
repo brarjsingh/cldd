@@ -27,8 +27,9 @@ BEGIN_C_DECLS
 
 #include "cmdline.h"
 
-#define MAXLINE     4096        /* max text line length */
-#define BACKLOG     1024
+#define MAXLINE         4096        /* max text line length */
+#define BACKLOG         1024
+#define EPOLL_QUEUE_LEN 256
 
 /* this needs to be global for error functions */
 extern struct options options;

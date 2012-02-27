@@ -25,6 +25,7 @@
 
 BEGIN_C_DECLS
 
+#include "cldd.h"
 #include "adt.h"
 
 typedef struct _server server;
@@ -36,9 +37,11 @@ struct _server {
     int n_max_connected;
     pid_t pid;
     bool running;
-    /* for select on client connections */
-    fd_set rset;
-    int maxfd;
+    /* for epoll on client connections */
+    int epoll_fd;
+    int num_fds;
+    struct epoll_event events[EPOLL_QUEUE_LEN];
+    struct epoll_event event;
     /* client management */
     queue *spawn_queue;
     llist *client_list;

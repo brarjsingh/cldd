@@ -30,6 +30,10 @@ typedef struct _client client;
 struct _client {
     int fd;
     pthread_t tid;
+    pthread_mutex_t msg_lock;
+    pthread_cond_t msg_ready;
+    char *msg;
+    bool msg_pending;
     struct sockaddr_in sa;
     socklen_t sa_len;
 };

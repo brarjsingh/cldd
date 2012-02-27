@@ -20,12 +20,30 @@
 
 #include <common.h>
 
+#include "cldd.h"
 #include "client.h"
 
 client *
 client_new (void)
 {
     client *c = malloc (sizeof (client));
+    c->msg = malloc (MAXLINE * sizeof (char));
+    c->msg_pending = false;
+
+    /* create the mutex for message handling */
+    if (pthread_mutex_init (&c->msg_lock, NULL) != 0)
+    {
+        free (c);
+        return NULL;
+    }
+
+    /* create condition variables for controlling message handling */
+    if (pthread_cond_init (&c->msg_ready, NULL) != 0)
+    {
+        free (c);
+        return NULL;
+    }
+
     return c;
 }
 
@@ -45,5 +63,13 @@ void
 client_free (void *c)
 {
     client *_c = (client *)c;
+
+    /* destroy the locks */
+    pthread_mutex_destroy (&_c->msg_lock);
+
+    /* destroy the condition variable */
+    pthread_cond_destroy (&_c->msg_ready);
+
+    free (_c->msg);
     free (_c);
 }
