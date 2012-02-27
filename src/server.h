@@ -36,6 +36,9 @@ struct _server {
     int n_max_connected;
     pid_t pid;
     bool running;
+    /* for select on client connections */
+    fd_set rset;
+    int maxfd;
     /* client management */
     queue *spawn_queue;
     llist *client_list;

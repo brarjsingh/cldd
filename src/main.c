@@ -301,8 +301,12 @@ client_spawn_handler (void *data)
 void *
 client_queue_handler (void *data)
 {
+    int nready;
     server *s = (server *)data;
     client *c = NULL;
+
+    FD_ZERO(&s->rset);
+    s->maxfd = s->fd;
 
     for (;;)
     {
@@ -312,19 +316,31 @@ client_queue_handler (void *data)
         c = client_new ();
         c->sa_len = sizeof (c->sa);
 
-        /* blocking call waiting for connections */
-        CLDD_MESSAGE("Waiting for a new client connection");
-        c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
-        CLDD_MESSAGE("Received connection from (%s, %d)",
-                     inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
+        FD_SET(s->fd, &s->rset);
+        if ((nready = select (s->maxfd + 1, &s->rset, NULL, NULL, NULL)) < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            else
+                CLDD_ERROR("select() error");
+        }
 
-        /* queue up the new connection */
-        pthread_mutex_lock (&s->spawn_queue_lock);
-        s->spawn_queue = queue_enqueue (s->spawn_queue, (void *)c);
-        pthread_mutex_unlock (&s->spawn_queue_lock);
-        /* don't need to signal if a queue exists */
-        if (queue_size (s->spawn_queue) == 1)
-            pthread_cond_signal (&s->spawn_queue_ready);
+        if (FD_ISSET(s->fd, &s->rset))
+        {
+            /* blocking call waiting for connections */
+            CLDD_MESSAGE("Waiting for a new client connection");
+            c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
+            CLDD_MESSAGE("Received connection from (%s, %d)",
+                        inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
+
+            /* queue up the new connection */
+            pthread_mutex_lock (&s->spawn_queue_lock);
+            s->spawn_queue = queue_enqueue (s->spawn_queue, (void *)c);
+            pthread_mutex_unlock (&s->spawn_queue_lock);
+            /* don't need to signal if a queue exists */
+            if (queue_size (s->spawn_queue) == 1)
+                pthread_cond_signal (&s->spawn_queue_ready);
+        }
 
         c = NULL;
     }
