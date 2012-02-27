@@ -37,7 +37,7 @@ void log_init (server *s, struct options *options)
     free (options->log_filename);
     /* doesn't account for file overwrites, fix later */
     s->logging = true;
-    s->logfp = fopen (s->log_filename, "w+");
+    s->logfp = fopen (s->log_filename, "w");
 }
 
 void setup_log_output (server *s)
@@ -62,48 +62,70 @@ void * logging_func (void *data)
 {
     int ret;
     struct timespec ts;
-    struct timeval tp;
     time_t start, current;
     double dt;
-    struct rusage usage;
-    struct rusage *rp=&usage;
+    char buf[PATH_MAX];
+    struct proc_stat_t ps;
+    char ps_filename[PATH_MAX];
+    FILE *psfp;
     server *s = (server *)data;
+
+    /* data for /proc/[pid]/stat */
+    sprintf (ps_filename, "/proc/stat");
+    psfp = fopen (ps_filename, "r");
 
     /* setup header */
     time (&start);
-    fprintf (s->logfp, "time, n_clients, max_clients, user(s), user(us), sys(s), sys(us)\n");
+    fprintf (s->logfp, "time, n_clients, max_clients, user, nice, system, "
+                       "idle, iowait\n");
 
     for (;s->logging;)
     {
-        ret = gettimeofday (&tp, NULL);
-        /* convert from timeval to timespec and add a 1s delay */
-        /* - NOTE - for < 1s (or > 1Hz) need to calculate new nsec to check
-         *          for overrun and +1s if it happens, else new < desired */
-        ts.tv_sec  = tp.tv_sec;
-        ts.tv_nsec = tp.tv_usec * 1000;
-        ts.tv_sec += 1;                 /* 1Hz */
+        pthread_mutex_lock (&log_timer_mutex);
+
+        /* setup logging timer for 10Hz */
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += 0;
+        ts.tv_nsec += 100000000;
+        if (ts.tv_nsec >= 1000000000)
+        {
+            ts.tv_sec++;
+            ts.tv_nsec -= 1000000000;
+        }
 
         /* wait for the set time */
-        pthread_mutex_lock (&log_timer_mutex);
         ret = pthread_cond_timedwait (&log_timer_cond, &log_timer_mutex, &ts);
-        pthread_mutex_unlock (&log_timer_mutex);
+        if ((ret != 0) && (ret != ETIMEDOUT))
+        {
+            CLDD_MESSAGE("pthread_cond_timedwait() returned %d\n", ret);
+            pthread_mutex_unlock (&log_timer_mutex);
+            break;
+        }
 
-        /* get the new usage data */
-        ret = getrusage (RUSAGE_SELF, rp);
-//        ret = getrusage (getppid (), rp);
+        pthread_mutex_unlock (&log_timer_mutex);
 
         /* refresh time for logging */
         time (&current);
         dt = difftime (current, start);
 
-        /* write new data to the log file */
-        fprintf (s->logfp, "%9.3f, %9d, %9d, %16lf, %16lf, %16lf, %16lf\n",
-                 dt, s->n_clients, s->n_max_connected,
-                 rp->ru_utime.tv_sec, rp->ru_utime.tv_usec,
-                 rp->ru_stime.tv_sec, rp->ru_stime.tv_usec);
+        /* read the average cpu values */
+        fscanf (psfp, "%s %lld %lld %lld %lld %lld",
+                &buf, &ps.user, &ps.nice, &ps.system, &ps.idle,
+                &ps.iowait);
+
+        /* reset the file to the beginning */
+        fseek (psfp, 0, SEEK_SET);
+
+        /* write the next line */
+        fprintf (s->logfp, "%.3f, %d, %d, %lld, %lld, %lld, %lld\n",
+                 dt, s->n_clients, s->n_max_connected, ps.user, ps.nice,
+                 ps.system, ps.idle, ps.iowait);
     }
 
     pthread_mutex_unlock (&log_timer_mutex);
+
+    //free (ps);
+    fclose (psfp);
 
     pthread_exit (NULL);
 }

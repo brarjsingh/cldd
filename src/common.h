@@ -62,6 +62,7 @@
 #include <time.h>
 #include <assert.h>
 #include <pthread.h>
+#include <linux/limits.h>
 
 #ifndef EXIT_SUCCESS
 #  define EXIT_SUCCESS  0

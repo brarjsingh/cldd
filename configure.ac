@@ -18,7 +18,7 @@ AC_DEFINE(PROTOCOL_VERSION, "0.1.0", [The CLD protocol version])
 dnl ---------------------------------------------------------------------------
 dnl Programs
 dnl ---------------------------------------------------------------------------
-AC_PROG_CC_C99
+dnl AC_PROG_CC_C99
 AC_PROG_CXX
 AC_PROG_RANLIB
 AM_PROG_CC_C_O
@@ -108,6 +108,7 @@ AC_CHECK_LIB(socket, socket, CLDD_LIBS="$CLDD_LIBS -lsocket",)
 AC_CHECK_LIB(nsl, gethostbyname, CLDD_LIBS="$CLDD_LIBS -lnsl",)
 AC_CHECK_LIB(pthread, pthread_create, CLDD_LIBS="$CLDD_LIBS -pthread")
 AC_CHECK_LIB(m, cos, CLDD_LIBS="$CLDD_LIBS -lm")
+AC_CHECK_LIB(rt, clock_gettime, CLDD_LIBS="$CLDD_LIBS -lrt")
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h])

@@ -32,6 +32,7 @@ server_new (void)
     if (s == NULL)
         CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
 
+    s->pid = getpid ();
     s->n_clients = 0;
     s->n_max_connected = 0;
 

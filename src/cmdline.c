@@ -53,6 +53,7 @@ usage (char **argv)
             "\t-h|?, --help\    show help options\n\n"
             "Application Options:\n"
             "\t-p, --port       the port to use for the daemon\n"
+            "\t-l, --logfile    a file to use for logging\n"
             "\t-k, --kill       kill the currently running cldd session\n"
             "\t-d, --daemon     detach from the console\n"
             "\t-v, --verbose    verbose logging\n"
@@ -105,6 +106,8 @@ parse_cmdline (int argc, char **argv, struct options *options)
                 free (options->log_filename);
                 options->log_filename = malloc (sizeof (optarg));
                 strcpy (options->log_filename, optarg);
+                options->log_filename[strlen (optarg)] = '\0';
+                //fprintf (stderr, "received: %s\n", options->log_filename);
                 break;
             case 'V':
                 version ();

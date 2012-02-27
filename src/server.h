@@ -34,6 +34,7 @@ struct _server {
     int port;
     int n_clients;
     int n_max_connected;
+    pid_t pid;
     bool running;
     /* client management */
     queue *spawn_queue;

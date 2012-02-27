@@ -28,6 +28,14 @@ BEGIN_C_DECLS
 #include "cmdline.h"
 #include "server.h"
 
+struct proc_stat_t {
+    long long int user;
+    long long int nice;
+    long long int system;
+    long long int idle;
+    long long int iowait;
+};
+
 extern pthread_t       logging_thread;
 extern pthread_cond_t  log_timer_cond;
 extern pthread_mutex_t log_timer_mutex;

@@ -198,7 +198,10 @@ client_func (void *data)
 {
     ssize_t n;
     char *recv;
-    char send[MAXLINE] = "random text to use for testing write to client\n";
+    /* this is hokey and only for the test, but a 64kB block will be sent
+     * to the client 16 times making 1kB sent in total */
+    char send[MAXLINE] =
+        "012345678901234567890123456789012345678901234567890123456789012\n";
     client *c = (client *)((struct client_data_t *)data)->c;
     server *s = (server *)((struct client_data_t *)data)->s;
 
@@ -217,7 +220,7 @@ client_func (void *data)
         if (n == 0)
             break;
 
-        //CLDD_MESSAGE("Read %d chars on sock fd %d: %s", n, c->fd, recv);
+        /* a request message received from the client triggers a write */
         if (strcmp (recv, "request\n") == 0)
         {
             if ((n = writen (c->fd, send, strlen (send))) != strlen (send))
