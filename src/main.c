@@ -149,6 +149,7 @@ client_manager (void *data)
     int i, n, ret, nready;
     const int on = 1;
     struct sockaddr_in servaddr;
+    node *link = NULL;
     client *c = NULL;
     struct client_data_t cd;
     struct client_data_t *pcd;
@@ -233,20 +234,37 @@ client_manager (void *data)
                 s->n_max_connected = (s->n_clients > s->n_max_connected)
                                     ? s->n_clients : s->n_max_connected;
                 pthread_mutex_unlock (&s->server_data_lock);
+
                 cd.s = s;
                 cd.c = c;
                 pcd = &cd;
                 pthread_create (&c->tid, NULL, client_func, pcd);
                 CLDD_MESSAGE("Create client thread %ld", c->tid);
 
+                pthread_mutex_lock (&s->server_data_lock);
+                s->client_list = llist_append (s->client_list, (void *)c);
+                CLDD_MESSAGE("Added client to list, new size: %d",
+                             llist_length (s->client_list));
+                pthread_mutex_unlock (&s->server_data_lock);
+
                 continue;
             }
 
-            /* blocking call to wait for client request */
-            n = readline (c->fd, c->msg, MAXLINE);
-            if (n == 0)
-                close (s->events[i].data.fd);
-            else
+            /* retrieve the client with fd == event fd */
+            link = s->client_list->link;
+            while (link != NULL)
+            {
+                if (((client *)(link->data))->fd == c->fd)
+                {
+                    c = (client *)link->data;
+                    break;
+                }
+                link = link->next;
+            }
+
+            /* read messages from client */
+            n = readline (s->events[i].data.fd, c->msg, MAXLINE);
+            if (n != 0)
                 c->msg_pending = true;
         }
 
@@ -309,7 +327,8 @@ client_func (void *data)
     s->n_clients--;
     pthread_mutex_unlock (&s->server_data_lock);
     close (c->fd);
-    client_free (c);
+    llist_remove (s->client_list, c, client_compare);
+//    client_free (c);
     c = NULL;
 
     pthread_exit (NULL);
@@ -323,42 +342,42 @@ client_spawn_handler (void *data)
 {
     server *s = (server *)data;
     client *c = NULL;
-    struct client_data_t cd;
-    struct client_data_t *pcd;
+//    struct client_data_t cd;
+//    struct client_data_t *pcd;
 
-    for (;;)
-    {
-        usleep (1000);
+//    for (;;)
+//    {
+//        usleep (1000);
 
-        pthread_mutex_lock (&s->spawn_queue_lock);
+//        pthread_mutex_lock (&s->spawn_queue_lock);
 
-        CLDD_MESSAGE("Spawning clients");
+//        CLDD_MESSAGE("Spawning clients");
         /* if any client requests were made spawn a new thread */
-        while (queue_is_empty (s->spawn_queue))
-            pthread_cond_wait (&s->spawn_queue_ready, &s->spawn_queue_lock);
+//        while (queue_is_empty (s->spawn_queue))
+//            pthread_cond_wait (&s->spawn_queue_ready, &s->spawn_queue_lock);
 
         /* pop the next node in the queue */
-        s->spawn_queue = queue_dequeue (s->spawn_queue, (void **)&c);
-        pthread_mutex_unlock (&s->spawn_queue_lock);
+//        s->spawn_queue = queue_dequeue (s->spawn_queue, (void **)&c);
+//        pthread_mutex_unlock (&s->spawn_queue_lock);
 
         /* launch the thread for the client */
-        pthread_mutex_lock (&s->server_data_lock);
-        s->n_clients++;
-        s->n_max_connected = (s->n_clients > s->n_max_connected)
-                             ? s->n_clients : s->n_max_connected;
-        pthread_mutex_unlock (&s->server_data_lock);
-        cd.s = s;
-        cd.c = c;
-        pcd = &cd;
-        pthread_create (&c->tid, NULL, client_func, pcd);
-        CLDD_MESSAGE("Create client thread %ld", c->tid);
+//        pthread_mutex_lock (&s->server_data_lock);
+//        s->n_clients++;
+//        s->n_max_connected = (s->n_clients > s->n_max_connected)
+//                             ? s->n_clients : s->n_max_connected;
+//        pthread_mutex_unlock (&s->server_data_lock);
+//        cd.s = s;
+//        cd.c = c;
+//        pcd = &cd;
+//        pthread_create (&c->tid, NULL, client_func, pcd);
+//        CLDD_MESSAGE("Create client thread %ld", c->tid);
 
-        pthread_mutex_lock (&s->server_data_lock);
-        s->client_list = llist_append (s->client_list, (void *)c);
-        CLDD_MESSAGE("Added client to list, new size: %d",
-                     llist_length (s->client_list));
-        pthread_mutex_unlock (&s->server_data_lock);
-    }
+//        pthread_mutex_lock (&s->server_data_lock);
+//        s->client_list = llist_append (s->client_list, (void *)c);
+//        CLDD_MESSAGE("Added client to list, new size: %d",
+//                     llist_length (s->client_list));
+//        pthread_mutex_unlock (&s->server_data_lock);
+//    }
 
     pthread_exit (NULL);
 }
