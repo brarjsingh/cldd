@@ -170,24 +170,6 @@ client_manager (void *data)
     if (listen (s->fd, BACKLOG) < 0)
         CLDD_ERROR("Unable to listen on socket %ld", s->fd);
 
-/* --- replacing queue management with select --- */
-
-    /* create the thread that monitors client requests */
-//    ret = pthread_create (&s->client_queue_tid, NULL, client_queue_handler, s);
-//    if (ret != 0)
-//        CLDD_ERROR("Failed to create thread to manage client queue requests");
-
-    /* create the thread that spawns client connections */
-//    ret = pthread_create (&s->client_spawn_tid, NULL, client_spawn_handler, s);
-//    if (ret != 0)
-//        CLDD_ERROR("Failed to create thread that spawns client connections");
-
-    /* wait for the control threads to finish */
-//    pthread_join (s->client_queue_tid, NULL);
-//    pthread_join (s->client_spawn_tid, NULL);
-
-/* --- old --- */
-
     FD_ZERO(&s->rset);
     s->maxfd = s->fd;
 
@@ -242,7 +224,7 @@ client_manager (void *data)
  *
  * Function to test client connections.
  *
- * @param sockfd The socket of the client
+ * @param data The data containing the client and server references
  **/
 void *
 client_func (void *data)
@@ -288,7 +270,6 @@ client_func (void *data)
 
     pthread_mutex_lock (&s->server_data_lock);
     s->n_clients--;
-//    llist_remove (s->client_list, (void *)c, client_compare);
     pthread_mutex_unlock (&s->server_data_lock);
     close (c->fd);
     client_free (c);
