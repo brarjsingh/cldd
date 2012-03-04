@@ -30,14 +30,6 @@
 #include "server.h"
 #include "utils.h"
 
-/* replace later with value taken from configuration file */
-#define PID_FILE    "/var/run/cldd.pid"
-
-struct client_data_t {
-    server *s;
-    client *c;
-};
-
 /* function prototypes */
 void signal_handler (int sig);
 void * client_manager (void *data);
@@ -67,6 +59,7 @@ main (int argc, char **argv)
 
     if (argc == 1)
         usage (argv);
+
     success = parse_cmdline (argc, argv, &options);
     if (!success)
         CLDD_ERROR("Error while parsing command line arguments\n");
