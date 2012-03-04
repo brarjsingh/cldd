@@ -136,13 +136,13 @@ queue_size (queue *q)
     if ((q == NULL) || (q->head == NULL && q->tail == NULL))
     {
         CLDD_MESSAGE("Queue is empty\n");
-        return q;
+        return 0;
     }
     else if (q->head == NULL || q->tail == NULL)
     {
         CLDD_MESSAGE("There is something wrong with the queue\n"
                      "One of the head/tail is empty while other is not\n");
-        return q;
+        return -1;
     }
 
     p = q->head;
@@ -167,13 +167,15 @@ llist_new (void)
 }
 
 void
-llist_free (llist *l)
+llist_free (llist *l, void (*free_func)(void *))
 {
-    while (l->link)
+    node *n = l->link;
+    while (n)
     {
-        if (l->link->data != NULL)
-            free (l->link->data);       /* probably shouldn't do it this way */
-        free (l->link);
+        if (n->data != NULL)
+            free_func (n->data);
+        l->link = l->link->next;
+        free (n);
     }
     free (l);
 }

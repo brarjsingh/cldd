@@ -20,28 +20,52 @@
 
 #include <common.h>
 
+#include "cldd.h"
 #include "client.h"
+#include "error.h"
+
+const char sendbuf[MAXLINE] =
+        "012345678901234567890123456789012345678901234567890123456789012\n";
 
 client *
 client_new (void)
 {
     client *c = malloc (sizeof (client));
-    c->data_ready = false;
-
-    /* lock setup */
-    if (pthread_mutex_init (&c->lock, NULL) != 0)
-    {
-        free (c);
-        return NULL;
-    }
-
-    if (pthread_cond_init (&c->ready, NULL) != 0)
-    {
-        free (c);
-        return NULL;
-    }
+    c->quit = false;
 
     return c;
+}
+
+/**
+ * client_process_cmd
+ *
+ * Processes the current client command that triggered an event.
+ *
+ * @param c The client data containing the file descriptor to write to.
+ */
+void
+client_process_cmd (client *c)
+{
+    ssize_t n;
+    char *recv;
+
+    recv = malloc (MAXLINE * sizeof (char));
+
+    n = readline (c->fd, recv, MAXLINE);
+    if (n == 0)
+        return;
+
+    /* a request message received from the client triggers a write */
+    if (strcmp (recv, "request\n") == 0)
+    {
+        if ((n = writen (c->fd, sendbuf, strlen (sendbuf))) != strlen (sendbuf))
+            CLDD_MESSAGE("Client write error - %d != %d", strlen (sendbuf), n);
+    }
+    else if (strcmp (recv, "quit\n") == 0)
+    {
+        c->quit = true;
+        return;
+    }
 }
 
 bool
@@ -60,10 +84,6 @@ void
 client_free (void *_a)
 {
     client *c = (client *)_a;
-
-    /* clean up thread variables */
-    pthread_mutex_destroy (&c->lock);
-    pthread_cond_destroy (&c->ready);
 
     free (c);
 }

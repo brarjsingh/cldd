@@ -25,6 +25,10 @@
 
 BEGIN_C_DECLS
 
+#include "cldd.h"
+
+extern const char sendbuf[MAXLINE];
+
 typedef struct _client client;
 
 struct _client {
@@ -32,13 +36,11 @@ struct _client {
     pthread_t tid;
     struct sockaddr_in sa;
     socklen_t sa_len;
-    /* thread variables to trigger on event */
-    bool data_ready;
-    pthread_mutex_t lock;
-    pthread_cond_t ready;
+    bool quit;
 };
 
 client * client_new (void);
+void client_process_cmd (client *c);
 bool client_compare (const void * _a, const void * _b);
 void client_free (void *_a);
 

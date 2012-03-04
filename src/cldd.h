@@ -25,9 +25,7 @@
 
 BEGIN_C_DECLS
 
-#include "client.h"
 #include "cmdline.h"
-#include "server.h"
 
 #define MAXLINE     4096        /* max text line length */
 #define BACKLOG     1024
@@ -37,11 +35,7 @@ BEGIN_C_DECLS
 
 /* this needs to be global for error functions */
 extern struct options options;
-
-struct client_data_t {
-    server *s;
-    client *c;
-};
+extern bool running;
 
 END_C_DECLS
 
