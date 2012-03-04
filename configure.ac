@@ -130,7 +130,7 @@ AC_ARG_ENABLE(tests,
 AM_CONDITIONAL(ENABLE_TESTS, test "x$enable_tests" = xyes)
 
 if test "x$enable_tests" = xyes; then
-	CLDD_FLAGS="$CLDD_CFLAGS -I/src"
+	CLDD_FLAGS="-I/src"
 fi
 
 AC_ARG_ENABLE(ipv6,

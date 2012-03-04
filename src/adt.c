@@ -215,13 +215,13 @@ llist_remove (llist *l,
               void *data,
               bool (*compare_func)(const void*, const void*))
 {
+    node *old = NULL;
+    node *temp = NULL;
+
     if (l == NULL)
         CLDD_MESSAGE("Empty list, can't delete data");
     else
     {
-        node *old = NULL;
-        node *temp = NULL;
-
         temp = l->link;
         while (temp != NULL)
         {

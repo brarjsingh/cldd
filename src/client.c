@@ -26,6 +26,21 @@ client *
 client_new (void)
 {
     client *c = malloc (sizeof (client));
+    c->data_ready = false;
+
+    /* lock setup */
+    if (pthread_mutex_init (&c->lock, NULL) != 0)
+    {
+        free (c);
+        return NULL;
+    }
+
+    if (pthread_cond_init (&c->ready, NULL) != 0)
+    {
+        free (c);
+        return NULL;
+    }
+
     return c;
 }
 
@@ -42,8 +57,13 @@ client_compare (const void * _a, const void * _b)
 }
 
 void
-client_free (void *c)
+client_free (void *_a)
 {
-    client *_c = (client *)c;
-    free (_c);
+    client *c = (client *)_a;
+
+    /* clean up thread variables */
+    pthread_mutex_destroy (&c->lock);
+    pthread_cond_destroy (&c->ready);
+
+    free (c);
 }
