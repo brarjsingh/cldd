@@ -25,6 +25,10 @@
 
 BEGIN_C_DECLS
 
+#include "cldd.h"
+
+extern const char sendbuf[MAXLINE];
+
 typedef struct _client client;
 
 struct _client {
@@ -36,11 +40,13 @@ struct _client {
     bool msg_pending;
     struct sockaddr_in sa;
     socklen_t sa_len;
+    bool quit;
 };
 
 client * client_new (void);
+void client_process_cmd (client *c);
 bool client_compare (const void * _a, const void * _b);
-void client_free (void *c);
+void client_free (gpointer data);
 
 END_C_DECLS
 

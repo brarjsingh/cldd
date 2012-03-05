@@ -1,7 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "../src/adt.h"
+#include "common.h"
+#include "adt.h"
 
 struct foo {
     int bar;

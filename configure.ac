@@ -114,6 +114,9 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h])
 AC_CHECK_HEADERS([valgrind/memcheck.h])
 
+PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.6],,
+	[AC_MSG_ERROR([glib-2.6 is required])])
+
 dnl ---------------------------------------------------------------------------
 dnl Allow tools to be specifically built
 dnl ---------------------------------------------------------------------------
@@ -130,7 +133,7 @@ AC_ARG_ENABLE(tests,
 AM_CONDITIONAL(ENABLE_TESTS, test "x$enable_tests" = xyes)
 
 if test "x$enable_tests" = xyes; then
-	CLDD_FLAGS="$CLDD_CFLAGS -I/src"
+	CLDD_FLAGS="-I/src"
 fi
 
 AC_ARG_ENABLE(ipv6,

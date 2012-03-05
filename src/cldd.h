@@ -31,8 +31,12 @@ BEGIN_C_DECLS
 #define BACKLOG         1024
 #define EPOLL_QUEUE_LEN 256
 
+/* replace later with value taken from configuration file */
+#define PID_FILE    "/var/run/cldd.pid"
+
 /* this needs to be global for error functions */
 extern struct options options;
+extern bool running;
 
 END_C_DECLS
 

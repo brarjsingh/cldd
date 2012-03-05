@@ -30,25 +30,16 @@
 #include "server.h"
 #include "utils.h"
 
-/* replace later with value taken from configuration file */
-#define PID_FILE    "/var/run/cldd.pid"
-
-struct client_data_t {
-    server *s;
-    client *c;
-};
-
 /* function prototypes */
 void signal_handler (int sig);
 void * client_manager (void *data);
-void * client_func (void *data);
-void * client_spawn_handler (void *data);
-void * client_queue_handler (void *data);
+void read_fds (server *s);
 
 pthread_t master_thread;
 pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
 
 struct options options;
+bool running = true;
 
 static void
 glue_daemonize_init (const struct options *options)
@@ -132,8 +123,8 @@ signal_handler (int sig)
             break;
     }
 
-    /* stop the thread responsible for client management */
-    pthread_cancel (master_thread);
+    /* condition to exit the main thread */
+    running = false;
 }
 
 /**
@@ -146,31 +137,13 @@ signal_handler (int sig)
 void *
 client_manager (void *data)
 {
-    int i, n, ret, nready;
-    const int on = 1;
-    struct sockaddr_in servaddr;
-    node *link = NULL;
+    int ret, nready;
     client *c = NULL;
-    struct client_data_t cd;
-    struct client_data_t *pcd;
-
+    GList *it, *next;
     server *s = (server *)data;
 
-    /* create TCP socket to listen for client connections */
-    CLDD_MESSAGE("Creating TCP socket");
-    s->fd = socket (AF_INET, SOCK_STREAM, 0);
-    setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (int));
-    set_nonblocking (s->fd);
-
-    bzero (&servaddr, sizeof (servaddr));
-    servaddr.sin_family      = AF_INET;
-    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
-    servaddr.sin_port        = htons (s->port);
-
-    if (bind (s->fd, (struct sockaddr *) &servaddr, sizeof (servaddr)) < 0)
-        CLDD_ERROR("Failed to bind socket %ld", s->fd);
-    if (listen (s->fd, BACKLOG) < 0)
-        CLDD_ERROR("Unable to listen on socket %ld", s->fd);
+    /* set up as a tcp server */
+    server_init_tcp (s);
 
     /* reate the epoll file descriptor */
     s->epoll_fd = epoll_create (EPOLL_QUEUE_LEN);
@@ -183,92 +156,17 @@ client_manager (void *data)
     if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, s->fd, &s->event) == -1)
         CLDD_ERROR("epoll_ctl() error");
 
-    for (;;)
+    for (;running;)
     {
-        /* get the client data ready */
-        c = client_new ();
-        c->sa_len = sizeof (c->sa);
-
+        pthread_mutex_lock (&s->data_lock);
         s->num_fds = epoll_wait (s->epoll_fd, s->events, EPOLL_QUEUE_LEN, -1);
+        pthread_mutex_unlock (&s->data_lock);
+
         if (s->num_fds < 0)
             CLDD_ERROR("Error while epoll_wait()");
 
-        for (i = 0; i < s->num_fds; i++)
-        {
-            /* error */
-            if (s->events[i].events & (EPOLLHUP | EPOLLERR))
-            {
-                CLDD_MESSAGE("epoll: EPOLLERR");
-                close(s->events[i].data.fd);
-                continue;
-            }
-            assert (s->events[i].events & EPOLLIN);
-
-            // receiving a connection request
-            if (s->events[i].data.fd == s->fd)
-            {
-                CLDD_MESSAGE("Waiting for a new client connection");
-                /* blocking call waiting for connections */
-                c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
-                if (c->fd == -1)
-                {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK)
-                        CLDD_ERROR("accept");
-                    continue;
-                }
-                CLDD_MESSAGE("Received connection from (%s, %d)",
-                             inet_ntoa (c->sa.sin_addr),
-                             ntohs (c->sa.sin_port));
-
-                /* make the new fd non-blocking */
-                set_nonblocking (c->fd);
-
-                // add the new socket descriptor to the epoll loop
-                s->event.data.fd = c->fd;
-                if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, c->fd, &s->event) == -1)
-                    CLDD_ERROR("epoll_ctl() error");
-
-                /* launch the thread for the client */
-                pthread_mutex_lock (&s->server_data_lock);
-                s->n_clients++;
-                s->n_max_connected = (s->n_clients > s->n_max_connected)
-                                    ? s->n_clients : s->n_max_connected;
-                pthread_mutex_unlock (&s->server_data_lock);
-
-                cd.s = s;
-                cd.c = c;
-                pcd = &cd;
-                pthread_create (&c->tid, NULL, client_func, pcd);
-                CLDD_MESSAGE("Create client thread %ld", c->tid);
-
-                pthread_mutex_lock (&s->server_data_lock);
-                s->client_list = llist_append (s->client_list, (void *)c);
-                CLDD_MESSAGE("Added client to list, new size: %d",
-                             llist_length (s->client_list));
-                pthread_mutex_unlock (&s->server_data_lock);
-
-                continue;
-            }
-
-            /* retrieve the client with fd == event fd */
-            link = s->client_list->link;
-            while (link != NULL)
-            {
-                if (((client *)(link->data))->fd == c->fd)
-                {
-                    c = (client *)link->data;
-                    break;
-                }
-                link = link->next;
-            }
-
-            /* read messages from client */
-            n = readline (s->events[i].data.fd, c->msg, MAXLINE);
-            if (n != 0)
-                c->msg_pending = true;
-        }
-
-        c = NULL;
+        /* data is available on one or more sockets */
+        read_fds (s);
     }
 
     CLDD_MESSAGE("Exiting the client manager");
@@ -278,159 +176,116 @@ client_manager (void *data)
 }
 
 /**
- * client_func
+ * read_fds
  *
- * Function to test client connections.
+ * ...
  *
- * @param sockfd The socket of the client
- **/
-void *
-client_func (void *data)
+ * @param s The server data containing the epoll events to handle
+ */
+void
+read_fds (server *s)
 {
-    ssize_t n;
-    /* this is hokey and only for the test, but a 64kB block will be sent
-     * to the client 16 times making 1kB sent in total */
-    char send[MAXLINE] =
-        "012345678901234567890123456789012345678901234567890123456789012\n";
-    client *c = (client *)((struct client_data_t *)data)->c;
-    server *s = (server *)((struct client_data_t *)data)->s;
+    int i, ret;
+    client *c = NULL;
+    GList *it, *next;
 
-    CLDD_MESSAGE("Entering client loop - sock fd = %d", c->fd);
-    for (;;)
+    for (i = 0; i < s->num_fds; i++)
     {
-        /* wait for a new message */
-        pthread_mutex_lock (&c->msg_lock);
-        /* if any client requests were made spawn a new thread */
-        while (!c->msg_pending)
-            pthread_cond_wait (&c->msg_ready, &c->msg_lock);
-
-        /* a request message received from the client triggers a write */
-        if (strcmp (c->msg, "request\n") == 0)
+        /* error */
+        if (s->events[i].events & (EPOLLHUP | EPOLLERR))
         {
-            if ((n = writen (c->fd, send, strlen (send))) != strlen (send))
-                CLDD_MESSAGE("Client write error - %d != %d", strlen (send), n);
+            CLDD_MESSAGE("epoll: EPOLLERR");
+            close(s->events[i].data.fd);
+            continue;
         }
-        else if (strcmp (c->msg, "quit\n") == 0)
+        assert (s->events[i].events & EPOLLIN);
+
+        /* notification on listening socket indicating one or more
+         * incoming connections */
+        if (s->events[i].data.fd == s->fd)
         {
-            pthread_mutex_unlock (&c->msg_lock);
-            break;
+            while (true)
+            {
+                /* create new client data */
+                c = client_new ();
+                c->sa_len = sizeof (c->sa);
+
+                CLDD_MESSAGE("Client connection requested");
+                c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
+                if (c->fd == -1)
+                {
+                    if ((errno == EAGAIN) ||
+                        (errno == EWOULDBLOCK))
+                    {
+                        /* all incoming connections have been processed */
+                        break;
+                    }
+                    else
+                    {
+                        CLDD_ERROR("accept");
+                        break;
+                    }
+                }
+
+                CLDD_MESSAGE("Received connection from (%s, %d)",
+                             inet_ntoa (c->sa.sin_addr),
+                             ntohs (c->sa.sin_port));
+
+                /* make the new fd non-blocking */
+                set_nonblocking (c->fd);
+
+                ret = pthread_mutex_lock (&s->data_lock);
+
+                /* update counters */
+                s->n_clients++;
+                s->n_max_connected = (s->n_clients > s->n_max_connected)
+                                    ? s->n_clients : s->n_max_connected;
+
+                /* add the new socket descriptor to the epoll loop */
+                s->event.data.fd = c->fd;
+                if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, c->fd, &s->event) == -1)
+                    CLDD_ERROR("epoll_ctl() error");
+
+                /* add the client data to the linked list */
+                s->client_list = g_list_append (s->client_list, (gpointer)c);
+                CLDD_MESSAGE("Added client to list, new size: %d",
+                             g_list_length (s->client_list));
+
+                pthread_mutex_unlock (&s->data_lock);
+            }
+
+            continue;
         }
+        else
+        {
+            /* go through the available connections */
+            it = s->client_list;
+            while (it != NULL)
+            {
+                c = (client *)it->data;
+                next = g_list_next (it);
+                if (c->fd == s->events[i].data.fd)
+                    break;
+                it = next;
+            }
 
-        /* message handled, reset */
-        c->msg_pending = false;
+            /* process any request that caused an event */
+            client_process_cmd (c);
 
-        pthread_mutex_unlock (&c->msg_lock);
+            /* check if the client is pending quit */
+            if (c->quit)
+            {
+                pthread_mutex_trylock (&s->data_lock);
+                s->n_clients--;
+                s->client_list = g_list_delete_link (s->client_list, it);
+                CLDD_MESSAGE("[%5d] Removed client from list, new size: %d",
+                             c->fd, g_list_length (s->client_list));
+                pthread_mutex_unlock (&s->data_lock);
+
+                close (c->fd);
+                client_free (c);
+                c = NULL;
+            }
+        }
     }
-    CLDD_MESSAGE("Leaving client loop");
-
-    pthread_mutex_lock (&s->server_data_lock);
-    s->n_clients--;
-    pthread_mutex_unlock (&s->server_data_lock);
-    close (c->fd);
-    llist_remove (s->client_list, c, client_compare);
-//    client_free (c);
-    c = NULL;
-
-    pthread_exit (NULL);
-}
-
-/**
- * monitor the client request queue and spawn client threads as necessary
- */
-void *
-client_spawn_handler (void *data)
-{
-    server *s = (server *)data;
-    client *c = NULL;
-//    struct client_data_t cd;
-//    struct client_data_t *pcd;
-
-//    for (;;)
-//    {
-//        usleep (1000);
-
-//        pthread_mutex_lock (&s->spawn_queue_lock);
-
-//        CLDD_MESSAGE("Spawning clients");
-        /* if any client requests were made spawn a new thread */
-//        while (queue_is_empty (s->spawn_queue))
-//            pthread_cond_wait (&s->spawn_queue_ready, &s->spawn_queue_lock);
-
-        /* pop the next node in the queue */
-//        s->spawn_queue = queue_dequeue (s->spawn_queue, (void **)&c);
-//        pthread_mutex_unlock (&s->spawn_queue_lock);
-
-        /* launch the thread for the client */
-//        pthread_mutex_lock (&s->server_data_lock);
-//        s->n_clients++;
-//        s->n_max_connected = (s->n_clients > s->n_max_connected)
-//                             ? s->n_clients : s->n_max_connected;
-//        pthread_mutex_unlock (&s->server_data_lock);
-//        cd.s = s;
-//        cd.c = c;
-//        pcd = &cd;
-//        pthread_create (&c->tid, NULL, client_func, pcd);
-//        CLDD_MESSAGE("Create client thread %ld", c->tid);
-
-//        pthread_mutex_lock (&s->server_data_lock);
-//        s->client_list = llist_append (s->client_list, (void *)c);
-//        CLDD_MESSAGE("Added client to list, new size: %d",
-//                     llist_length (s->client_list));
-//        pthread_mutex_unlock (&s->server_data_lock);
-//    }
-
-    pthread_exit (NULL);
-}
-
-/**
- * wait for new client connection requests
- */
-void *
-client_queue_handler (void *data)
-{
-    int nready;
-    server *s = (server *)data;
-    client *c = NULL;
-
-//    FD_ZERO(&s->rset);
-//    s->maxfd = s->fd;
-
-//    for (;;)
-//    {
-//        usleep (1000);
-
-        /* get the client data ready */
-//        c = client_new ();
-//        c->sa_len = sizeof (c->sa);
-
-//        FD_SET(s->fd, &s->rset);
-//        if ((nready = select (s->maxfd + 1, &s->rset, NULL, NULL, NULL)) < 0)
-//        {
-//            if (errno == EINTR)
-//                continue;
-//            else
-//                CLDD_ERROR("select() error");
-//        }
-
-//        if (FD_ISSET(s->fd, &s->rset))
-//        {
-            /* blocking call waiting for connections */
-//            CLDD_MESSAGE("Waiting for a new client connection");
-//            c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
-//            CLDD_MESSAGE("Received connection from (%s, %d)",
-//                        inet_ntoa (c->sa.sin_addr), ntohs (c->sa.sin_port));
-
-            /* queue up the new connection */
-//            pthread_mutex_lock (&s->spawn_queue_lock);
-//            s->spawn_queue = queue_enqueue (s->spawn_queue, (void *)c);
-//            pthread_mutex_unlock (&s->spawn_queue_lock);
-            /* don't need to signal if a queue exists */
-//            if (queue_size (s->spawn_queue) == 1)
-//                pthread_cond_signal (&s->spawn_queue_ready);
-//        }
-
-//        c = NULL;
-//    }
-
-    pthread_exit (NULL);
 }

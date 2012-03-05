@@ -22,6 +22,7 @@
 
 #include "cldd.h"
 #include "adt.h"
+#include "client.h"
 #include "error.h"
 #include "server.h"
 
@@ -36,20 +37,8 @@ server_new (void)
     s->n_clients = 0;
     s->n_max_connected = 0;
 
-    /* create the collections for client management */
-    s->spawn_queue = queue_new ();
-    s->client_list = llist_new ();
-
     /* create the mutexes for controlling access to thread data */
-    if ((pthread_mutex_init (&s->spawn_queue_lock, NULL) != 0) ||
-        (pthread_mutex_init (&s->server_data_lock, NULL) != 0))
-    {
-        free (s);
-        return NULL;
-    }
-
-    /* create condition variables for controlling thread synchronization */
-    if (pthread_cond_init (&s->spawn_queue_ready, NULL) != 0)
+    if (pthread_mutex_init (&s->data_lock, NULL) != 0)
     {
         free (s);
         return NULL;
@@ -59,18 +48,44 @@ server_new (void)
 }
 
 void
+server_init_tcp (server *s)
+{
+    const int on = 1;
+    struct sockaddr_in servaddr;
+
+    /* create TCP socket to listen for client connections */
+    CLDD_MESSAGE("Creating TCP socket");
+    s->fd = socket (AF_INET, SOCK_STREAM, 0);
+    if (s->fd < 0)
+        CLDD_ERROR("Socket creation");
+
+    /* set the socket to allow re-bind without wait issues */
+    setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (int));
+
+    /* make the server socket non-blocking */
+    set_nonblocking (s->fd);
+
+    bzero (&servaddr, sizeof (servaddr));
+    servaddr.sin_family      = AF_INET;
+    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
+    servaddr.sin_port        = htons (s->port);
+
+    if (bind (s->fd, (struct sockaddr *) &servaddr, sizeof (servaddr)) < 0)
+        CLDD_ERROR("Failed to bind socket %ld", s->fd);
+
+    /* setup the socket for incoming connections */
+    if (listen (s->fd, BACKLOG) < 0)
+        CLDD_ERROR("Unable to listen on socket %ld", s->fd);
+}
+
+void
 server_free (server *s)
 {
     /* clear the data for the collections */
-    queue_free (s->spawn_queue);
-    llist_free (s->client_list);
+    g_list_free (s->client_list);
 
     /* destroy the locks */
-    pthread_mutex_destroy (&s->spawn_queue_lock);
-    pthread_mutex_destroy (&s->server_data_lock);
-
-    /* destroy the condition variable */
-    pthread_cond_destroy (&s->spawn_queue_ready);
+    pthread_mutex_destroy (&s->data_lock);
 
     /* string should be guaranteed to contain a value */
     free (s->log_filename);

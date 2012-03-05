@@ -43,14 +43,9 @@ struct _server {
     struct epoll_event events[EPOLL_QUEUE_LEN];
     struct epoll_event event;
     /* client management */
-    queue *spawn_queue;
-    llist *client_list;
+    GList *client_list;
     /* data for threading */
-    pthread_t client_spawn_tid;
-    pthread_t client_queue_tid;
-    pthread_mutex_t server_data_lock;
-    pthread_mutex_t spawn_queue_lock;
-    pthread_cond_t spawn_queue_ready;
+    pthread_mutex_t data_lock;
     /* performance logging */
     bool logging;
     FILE *logfp;
@@ -58,6 +53,7 @@ struct _server {
 };
 
 server * server_new (void);
+void server_init_tcp (server *s);
 void server_free (server *s);
 
 END_C_DECLS
