@@ -49,6 +49,13 @@ glue_daemonize_init (const struct options *options)
         daemonize_kill ();
 }
 
+static void
+list_test_print (gpointer data)
+{
+    client *c = (client *)data;
+    CLDD_MESSAGE("Got client %d", c->fd);
+}
+
 int
 main (int argc, char **argv)
 {

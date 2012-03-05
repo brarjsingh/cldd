@@ -64,6 +64,9 @@
 #include <pthread.h>
 #include <linux/limits.h>
 
+/* gave up and included glib for top and adt implementations */
+#include <glib.h>
+
 #ifndef EXIT_SUCCESS
 #  define EXIT_SUCCESS  0
 #  define EXIT_FAILURE  1

@@ -37,9 +37,6 @@ server_new (void)
     s->n_clients = 0;
     s->n_max_connected = 0;
 
-    /* create the collections for client management */
-    s->client_list = llist_new ();
-
     /* create the mutexes for controlling access to thread data */
     if (pthread_mutex_init (&s->data_lock, NULL) != 0)
     {

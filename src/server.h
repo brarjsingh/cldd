@@ -40,7 +40,7 @@ struct _server {
     fd_set fds;
     int maxfd;
     /* client management */
-    llist *client_list;
+    GList *client_list;
     /* data for threading */
     pthread_mutex_t data_lock;
     /* performance logging */

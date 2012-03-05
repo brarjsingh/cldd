@@ -10,10 +10,12 @@ AM_CFLAGS += -DSYSTEM_CONFIG_FILE_LOCATION='"$(sysconfdir)/cldd.conf"'
 
 cldd_CFLAGS = \
 	$(AM_CFLAGS) \
+	$(GLIB_CFLAGS) \
 	$(CLDD_CFLAGS)
 
 cldd_LDADD = \
 	$(CLDD_LIBS) \
+	$(GLIB_LIBS) \
 	$(INTLLIBS)
 
 cldd_headers = \

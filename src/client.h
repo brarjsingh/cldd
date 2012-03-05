@@ -42,7 +42,7 @@ struct _client {
 client * client_new (void);
 void client_process_cmd (client *c);
 bool client_compare (const void * _a, const void * _b);
-void client_free (void *_a);
+void client_free (gpointer data);
 
 END_C_DECLS
 

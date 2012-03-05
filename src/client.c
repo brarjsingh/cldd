@@ -81,9 +81,8 @@ client_compare (const void * _a, const void * _b)
 }
 
 void
-client_free (void *_a)
+client_free (gpointer data)
 {
-    client *c = (client *)_a;
-
+    client *c = (client *)data;
     free (c);
 }
