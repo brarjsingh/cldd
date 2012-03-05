@@ -20,6 +20,11 @@
 
 #include <common.h>
 
+#include <glibtop.h>
+#include <glibtop/cpu.h>
+#include <glibtop/mem.h>
+#include <glibtop/proclist.h>
+
 #include "log.h"
 #include "cmdline.h"
 #include "error.h"
@@ -31,10 +36,15 @@ pthread_mutex_t log_timer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void log_init (server *s, struct options *options)
 {
+    /* should create a log struct and do this in a new func */
+    glibtop_init ();
+
     s->log_filename = malloc (sizeof (options->log_filename));
     strcpy (s->log_filename, options->log_filename);
+
     /* don't need the options string anymore, free memory */
     free (options->log_filename);
+
     /* doesn't account for file overwrites, fix later */
     s->logging = true;
     s->logfp = fopen (s->log_filename, "w");
@@ -65,26 +75,33 @@ void * logging_func (void *data)
     time_t start, current;
     double dt;
     char buf[PATH_MAX];
-    struct proc_stat_t ps;
-    char ps_filename[PATH_MAX];
-    FILE *psfp;
+///    struct proc_stat_t ps;
+///    char ps_filename[PATH_MAX];
+///    FILE *psfp;
     server *s = (server *)data;
 
+    /* new stuff for glibtop */
+    glibtop_cpu cpu;
+    glibtop_mem memory;
+//    glibtop_proclist proclist;
+
     /* data for /proc/[pid]/stat */
-    sprintf (ps_filename, "/proc/stat");
-    psfp = fopen (ps_filename, "r");
+///    sprintf (ps_filename, "/proc/stat");
+///    psfp = fopen (ps_filename, "r");
 
     /* setup header */
     time (&start);
-    fprintf (s->logfp, "time, n_clients, max_clients, user, nice, system, "
-                       "idle, iowait\n");
+    fprintf (s->logfp, "time, n_clients, max_clients, cpu_tot, cpu_user, "
+                       "cpu_nice, cpu_sys, cpu_idle, cpu_freq, mem_tot (MB), "
+                       "mem_used (MB), mem_free (MB), mem_buffered (MB), "
+                       "mem_cached (MB), mem_user (MB), mem_locked (MB)\n");
 
     for (;s->logging;)
     {
         pthread_mutex_lock (&log_timer_mutex);
 
         /* setup logging timer for 10Hz */
-        clock_gettime(CLOCK_REALTIME, &ts);
+        clock_gettime (CLOCK_REALTIME, &ts);
         ts.tv_sec += 0;
         ts.tv_nsec += 100000000;
         if (ts.tv_nsec >= 1000000000)
@@ -101,31 +118,51 @@ void * logging_func (void *data)
             pthread_mutex_unlock (&log_timer_mutex);
             break;
         }
-
         pthread_mutex_unlock (&log_timer_mutex);
 
         /* refresh time for logging */
         time (&current);
         dt = difftime (current, start);
 
+        glibtop_get_cpu (&cpu);
+        glibtop_get_mem (&memory);
+
         /* read the average cpu values */
-        fscanf (psfp, "%s %lld %lld %lld %lld %lld",
-                &buf, &ps.user, &ps.nice, &ps.system, &ps.idle,
-                &ps.iowait);
+///        fscanf (psfp, "%s %lld %lld %lld %lld %lld",
+///                &buf, &ps.user, &ps.nice, &ps.system, &ps.idle,
+///                &ps.iowait);
 
         /* reset the file to the beginning */
-        fseek (psfp, 0, SEEK_SET);
+///        fseek (psfp, 0, SEEK_SET);
 
         /* write the next line */
-        fprintf (s->logfp, "%.3f, %d, %d, %lld, %lld, %lld, %lld\n",
-                 dt, s->n_clients, s->n_max_connected, ps.user, ps.nice,
-                 ps.system, ps.idle, ps.iowait);
+///        fprintf (s->logfp, "%.3f, %d, %d, %lld, %lld, %lld, %lld\n",
+///                 dt, s->n_clients, s->n_max_connected, ps.user, ps.nice,
+///                 ps.system, ps.idle, ps.iowait);
+
+        fprintf (s->logfp, "%.3f, %d, %d, %ld, %ld, %ld, %ld, %ld, %ld, %ld, "
+                           "%ld, %ld, %ld, %ld, %ld, %ld, %ld\n",
+                 dt, s->n_clients, s->n_max_connected,
+                 (unsigned long)cpu.total,
+                 (unsigned long)cpu.user,
+                 (unsigned long)cpu.nice,
+                 (unsigned long)cpu.sys,
+                 (unsigned long)cpu.idle,
+                 (unsigned long)cpu.frequency,
+                 (unsigned long)memory.total/(1024*1024),
+                 (unsigned long)memory.used/(1024*1024),
+                 (unsigned long)memory.free/(1024*1024),
+                 (unsigned long)memory.shared/(1024*1024),
+                 (unsigned long)memory.buffer/(1024*1024),
+                 (unsigned long)memory.cached/(1024*1024),
+                 (unsigned long)memory.user/(1024*1024),
+                 (unsigned long)memory.locked/(1024*1024));
     }
 
     pthread_mutex_unlock (&log_timer_mutex);
 
     //free (ps);
-    fclose (psfp);
+///    fclose (psfp);
 
     pthread_exit (NULL);
 }
