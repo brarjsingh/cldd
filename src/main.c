@@ -49,13 +49,6 @@ glue_daemonize_init (const struct options *options)
         daemonize_kill ();
 }
 
-static void
-list_test_print (gpointer data)
-{
-    client *c = (client *)data;
-    CLDD_MESSAGE("Got client %d", c->fd);
-}
-
 int
 main (int argc, char **argv)
 {
@@ -146,7 +139,7 @@ client_manager (void *data)
 {
     int ret, nready;
     client *c = NULL;
-    node *n = NULL;
+    GList *it, *next;
     server *s = (server *)data;
 
     /* set up as a tcp server */
@@ -161,12 +154,15 @@ client_manager (void *data)
 
         /* loop through all possible socket connections and add
          * them to fd_set */
-        for (n = s->client_list->link; n != NULL; n = n->next)
+        it = s->client_list;
+        while (it != NULL)
         {
-            c = (client *)n->data;
+            c = (client *)it->data;
+            next = g_list_next (it);
             FD_SET(c->fd, &s->fds);
             if (c->fd > s->maxfd)
                 s->maxfd = c->fd;
+            it = next;
         }
 
         /* check for socket requests */
@@ -209,7 +205,7 @@ read_fds (server *s)
 {
     int ret;
     client *c = NULL;
-    node *n = NULL;
+    GList *it, *next;
 
     /* check if a client is trying to connect */
     ret = pthread_mutex_trylock (&s->data_lock);
@@ -231,17 +227,20 @@ read_fds (server *s)
                               s->n_clients : s->n_max_connected;
 
         /* add the client data to the linked list */
-        s->client_list = llist_append (s->client_list, (void *)c);
+        s->client_list = g_list_append (s->client_list, (gpointer)c);
         CLDD_MESSAGE("Added client to list, new size: %d",
-                     llist_length (s->client_list));
+                     g_list_length (s->client_list));
         c = NULL;
     }
     pthread_mutex_unlock (&s->data_lock);
 
     /* go through the available connections */
-    for (n = s->client_list->link; n != NULL; n = n->next)
+    it = s->client_list;
+    while (it != NULL)
     {
-        c = (client *)n->data;
+        c = (client *)it->data;
+        next = g_list_next (it);
+
         /* process any request that caused an event */
         pthread_mutex_trylock (&s->data_lock);
         if (FD_ISSET(c->fd, &s->fds))
@@ -253,16 +252,16 @@ read_fds (server *s)
         {
             pthread_mutex_trylock (&s->data_lock);
             s->n_clients--;
-            s->client_list = llist_remove (s->client_list,
-                                           (void *)c,
-                                           client_compare);
+            s->client_list = g_list_delete_link (s->client_list, it);
             CLDD_MESSAGE("[%5d] Removed client from list, new size: %d",
-                         c->fd, llist_length (s->client_list));
+                         c->fd, g_list_length (s->client_list));
             pthread_mutex_unlock (&s->data_lock);
 
             close (c->fd);
             client_free (c);
             c = NULL;
         }
+
+        it = next;
     }
 }

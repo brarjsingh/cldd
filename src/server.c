@@ -85,7 +85,7 @@ void
 server_free (server *s)
 {
     /* clear the data for the collections */
-    llist_free (s->client_list, client_free);
+    g_list_free (s->client_list);
 
     /* destroy the locks */
     pthread_mutex_destroy (&s->data_lock);
