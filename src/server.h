@@ -48,6 +48,7 @@ struct _server {
     pthread_mutex_t data_lock;
     /* performance logging */
     bool logging;
+    FILE *statsfp;
     FILE *logfp;
     char *log_filename;
 };

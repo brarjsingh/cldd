@@ -31,6 +31,8 @@ client *
 client_new (void)
 {
     client *c = malloc (sizeof (client));
+    c->ntot = 0;
+    c->nreq = 0;
     c->quit = false;
 
     return c;
@@ -62,10 +64,10 @@ client_process_cmd (client *c)
             CLDD_MESSAGE("Client write error - %d != %d", strlen (sendbuf), n);
     }
     else if (strcmp (recv, "quit\n") == 0)
-    {
         c->quit = true;
-        return;
-    }
+
+    c->ntot += n;
+    c->nreq++;
 }
 
 bool

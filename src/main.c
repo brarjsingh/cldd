@@ -118,6 +118,9 @@ signal_handler (int sig)
         case SIGTERM:
             syslog (LOG_WARNING, "Received SIGTERM signal.");
             break;
+        case SIGINT:
+            syslog (LOG_WARNING, "Received SIGINT signal.");
+            break;
         default:
             syslog (LOG_WARNING, "Unhandled signal (%d) %s", strsignal(sig));
             break;
@@ -125,6 +128,7 @@ signal_handler (int sig)
 
     /* condition to exit the main thread */
     running = false;
+    pthread_cancel (master_thread);
 }
 
 /**
@@ -278,8 +282,11 @@ read_fds (server *s)
                 pthread_mutex_trylock (&s->data_lock);
                 s->n_clients--;
                 s->client_list = g_list_delete_link (s->client_list, it);
-                CLDD_MESSAGE("[%5d] Removed client from list, new size: %d",
-                             c->fd, g_list_length (s->client_list));
+                CLDD_MESSAGE("Removed client from list, new size: %d",
+                             g_list_length (s->client_list));
+                /* log the client stats before closing it */
+                fprintf (s->statsfp, "%s, %d, %d, %d\n",
+                         inet_ntoa (c->sa.sin_addr), c->fd, c->nreq, c->ntot);
                 pthread_mutex_unlock (&s->data_lock);
 
                 close (c->fd);

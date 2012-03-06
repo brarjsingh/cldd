@@ -36,6 +36,8 @@ pthread_mutex_t log_timer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void log_init (server *s, struct options *options)
 {
+    char stats_filename[80];
+
     /* should create a log struct and do this in a new func */
     glibtop_init ();
 
@@ -45,9 +47,16 @@ void log_init (server *s, struct options *options)
     /* don't need the options string anymore, free memory */
     free (options->log_filename);
 
-    /* doesn't account for file overwrites, fix later */
+    /* these don't account for file overwrites, fix later */
     s->logging = true;
+
+    /* hard coded - ugh, fix later */
+    sprintf (stats_filename, "stats.%d.log", getpid ());
+    s->statsfp = fopen (stats_filename, "w");
     s->logfp = fopen (s->log_filename, "w");
+
+    /* write header to client stats log */
+    fprintf (s->statsfp, "client stats:\n\nhost, fd, nreq, ntot\n");
 }
 
 void setup_log_output (server *s)
@@ -65,6 +74,7 @@ void close_log_files (server *s)
     s->logging = false;
     pthread_join (logging_thread, NULL);
     /* add error checking later */
+    fclose (s->statsfp);
     fclose (s->logfp);
 }
 
