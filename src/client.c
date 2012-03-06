@@ -26,6 +26,9 @@ client *
 client_new (void)
 {
     client *c = malloc (sizeof (client));
+    c->ntot = 0;
+    c->nreq = 0;
+    c->quit = false;
     return c;
 }
 
@@ -42,8 +45,8 @@ client_compare (const void * _a, const void * _b)
 }
 
 void
-client_free (void *c)
+client_free (void *a)
 {
-    client *_c = (client *)c;
-    free (_c);
+    client *c = (client *)a;
+    free (c);
 }

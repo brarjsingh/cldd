@@ -120,6 +120,9 @@ signal_handler (int sig)
         case SIGTERM:
             syslog (LOG_WARNING, "Received SIGTERM signal.");
             break;
+        case SIGINT:
+            syslog (LOG_WARNING, "Received SIGINT signal.");
+            break;
         default:
             syslog (LOG_WARNING, "Unhandled signal (%d) %s", strsignal(sig));
             break;
@@ -219,10 +222,13 @@ client_func (void *data)
             if ((n = writen (c->fd, send, strlen (send))) != strlen (send))
                 CLDD_MESSAGE("Client write error - %d != %d", strlen (send), n);
             pthread_mutex_unlock (&master_lock);
+            c->nreq++;
+            c->ntot += n;
         }
         else if (strcmp (recv, "quit\n") == 0)
         {
             pthread_mutex_unlock (&master_lock);
+            c->nreq++;
             break;
         }
     }
@@ -232,6 +238,9 @@ client_func (void *data)
     s->n_clients--;
     llist_remove (s->client_list, (void *)c, client_compare);
     pthread_mutex_unlock (&s->server_data_lock);
+    /* log the client stats before closing it */
+    fprintf (s->statsfp, "%s, %d, %d, %d\n",
+             inet_ntoa (c->sa.sin_addr), c->fd, c->nreq, c->ntot);
     close (c->fd);
     client_free (c);
     c = NULL;

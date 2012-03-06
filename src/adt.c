@@ -136,13 +136,13 @@ queue_size (queue *q)
     if ((q == NULL) || (q->head == NULL && q->tail == NULL))
     {
         CLDD_MESSAGE("Queue is empty\n");
-        return q;
+        return 0;
     }
     else if (q->head == NULL || q->tail == NULL)
     {
         CLDD_MESSAGE("There is something wrong with the queue\n"
                      "One of the head/tail is empty while other is not\n");
-        return q;
+        return -1;
     }
 
     p = q->head;
@@ -215,13 +215,13 @@ llist_remove (llist *l,
               void *data,
               bool (*compare_func)(const void*, const void*))
 {
+    node *old = NULL;
+    node *temp = NULL;
+
     if (l == NULL)
         CLDD_MESSAGE("Empty list, can't delete data");
     else
     {
-        node *old = NULL;
-        node *temp = NULL;
-
         temp = l->link;
         while (temp != NULL)
         {

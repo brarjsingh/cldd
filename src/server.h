@@ -47,6 +47,7 @@ struct _server {
     pthread_cond_t spawn_queue_ready;
     /* performance logging */
     bool logging;
+    FILE *statsfp;
     FILE *logfp;
     char *log_filename;
 };

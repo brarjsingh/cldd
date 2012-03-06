@@ -114,6 +114,12 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h])
 AC_CHECK_HEADERS([valgrind/memcheck.h])
 
+PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.6],,
+	[AC_MSG_ERROR([glib-2.6 is required])])
+
+PKG_CHECK_MODULES([GLIBTOP], [libgtop-2.0],,
+	[AC_MSG_ERROR([libgtop-2.0 is required])])
+
 dnl ---------------------------------------------------------------------------
 dnl Allow tools to be specifically built
 dnl ---------------------------------------------------------------------------

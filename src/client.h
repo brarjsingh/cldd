@@ -32,11 +32,15 @@ struct _client {
     pthread_t tid;
     struct sockaddr_in sa;
     socklen_t sa_len;
+    bool quit;
+    /* for stats logging */
+    int nreq;
+    int ntot;
 };
 
 client * client_new (void);
 bool client_compare (const void * _a, const void * _b);
-void client_free (void *c);
+void client_free (void *a);
 
 END_C_DECLS
 
