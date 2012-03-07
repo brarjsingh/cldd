@@ -20,14 +20,15 @@
 
 #include <common.h>
 
+#include <glibtop.h>
+#include <glibtop/cpu.h>
+#include <glibtop/mem.h>
+#include <glibtop/proclist.h>
+
 #include "log.h"
 #include "cmdline.h"
 #include "error.h"
 #include "server.h"
-
-#include <glibtop.h>
-#include <glibtop/cpu.h>
-#include <glibtop/mem.h>
 
 pthread_t       logging_thread;
 pthread_cond_t  log_timer_cond  = PTHREAD_COND_INITIALIZER;
@@ -42,10 +43,14 @@ void log_init (server *s, struct options *options)
 
     s->log_filename = malloc (sizeof (options->log_filename));
     strcpy (s->log_filename, options->log_filename);
+
     /* don't need the options string anymore, free memory */
     free (options->log_filename);
-    /* doesn't account for file overwrites, fix later */
+
+    /* these don't account for file overwrites, fix later */
     s->logging = true;
+
+    /* hard coded - ugh, fix later */
     sprintf (stats_filename, "stats.%d.log", getpid ());
     s->statsfp = fopen (stats_filename, "w");
     s->logfp = fopen (s->log_filename, "w");
@@ -85,6 +90,7 @@ void * logging_func (void *data)
     /* new stuff for glibtop */
     glibtop_cpu cpu;
     glibtop_mem memory;
+//    glibtop_proclist proclist;
 
     /* setup header */
     time (&start);
@@ -115,7 +121,6 @@ void * logging_func (void *data)
             pthread_mutex_unlock (&log_timer_mutex);
             break;
         }
-
         pthread_mutex_unlock (&log_timer_mutex);
 
         /* refresh time for logging */

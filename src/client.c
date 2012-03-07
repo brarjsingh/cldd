@@ -20,7 +20,12 @@
 
 #include <common.h>
 
+#include "cldd.h"
 #include "client.h"
+#include "error.h"
+
+const char sendbuf[MAXLINE] =
+        "012345678901234567890123456789012345678901234567890123456789012\n";
 
 client *
 client_new (void)
@@ -29,7 +34,40 @@ client_new (void)
     c->ntot = 0;
     c->nreq = 0;
     c->quit = false;
+
     return c;
+}
+
+/**
+ * client_process_cmd
+ *
+ * Processes the current client command that triggered an event.
+ *
+ * @param c The client data containing the file descriptor to write to.
+ */
+void
+client_process_cmd (client *c)
+{
+    ssize_t n;
+    char *recv;
+
+    recv = malloc (MAXLINE * sizeof (char));
+
+    n = readline (c->fd, recv, MAXLINE);
+    if (n == 0)
+        return;
+
+    /* a request message received from the client triggers a write */
+    if (strcmp (recv, "request\n") == 0)
+    {
+        if ((n = writen (c->fd, sendbuf, strlen (sendbuf))) != strlen (sendbuf))
+            CLDD_MESSAGE("Client write error - %d != %d", strlen (sendbuf), n);
+    }
+    else if (strcmp (recv, "quit\n") == 0)
+        c->quit = true;
+
+    c->ntot += n;
+    c->nreq++;
 }
 
 bool
@@ -45,8 +83,8 @@ client_compare (const void * _a, const void * _b)
 }
 
 void
-client_free (void *a)
+client_free (gpointer data)
 {
-    client *c = (client *)a;
+    client *c = (client *)data;
     free (c);
 }

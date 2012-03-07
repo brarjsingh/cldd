@@ -167,13 +167,15 @@ llist_new (void)
 }
 
 void
-llist_free (llist *l)
+llist_free (llist *l, void (*free_func)(void *))
 {
-    while (l->link)
+    node *n = l->link;
+    while (n)
     {
-        if (l->link->data != NULL)
-            free (l->link->data);       /* probably shouldn't do it this way */
-        free (l->link);
+        if (n->data != NULL)
+            free_func (n->data);
+        l->link = l->link->next;
+        free (n);
     }
     free (l);
 }

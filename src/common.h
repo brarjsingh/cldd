@@ -22,6 +22,7 @@
 #include <sys/un.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/epoll.h>
 
 #if STDC_HEADERS
 #  include <stdio.h>

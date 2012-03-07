@@ -94,7 +94,7 @@ llist_new (void);
  *
  */
 void
-llist_free (llist *l);
+llist_free (llist *l, void (*free_func)(void *));
 
 /**
  *

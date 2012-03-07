@@ -25,23 +25,18 @@
 
 BEGIN_C_DECLS
 
-#include "client.h"
 #include "cmdline.h"
-#include "server.h"
 
-#define MAXLINE     4096        /* max text line length */
-#define BACKLOG     1024
+#define MAXLINE         4096        /* max text line length */
+#define BACKLOG         1024
+#define EPOLL_QUEUE_LEN 256
 
 /* replace later with value taken from configuration file */
 #define PID_FILE    "/var/run/cldd.pid"
 
 /* this needs to be global for error functions */
 extern struct options options;
-
-struct client_data_t {
-    server *s;
-    client *c;
-};
+extern bool running;
 
 END_C_DECLS
 
