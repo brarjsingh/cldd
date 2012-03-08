@@ -53,14 +53,14 @@ client_process_cmd (client *c)
 
     recv = malloc (MAXLINE * sizeof (char));
 
-    n = readline (c->fd, recv, MAXLINE);
+    n = readline (c->fd_mgmt, recv, MAXLINE);
     if (n == 0)
         return;
 
     /* a request message received from the client triggers a write */
     if (strcmp (recv, "request\n") == 0)
     {
-        if ((n = writen (c->fd, sendbuf, strlen (sendbuf))) != strlen (sendbuf))
+        if ((n = writen (c->fd_mgmt, sendbuf, strlen (sendbuf))) != strlen (sendbuf))
             CLDD_MESSAGE("Client write error - %d != %d", strlen (sendbuf), n);
     }
     else if (strcmp (recv, "quit\n") == 0)
@@ -76,7 +76,7 @@ client_compare (const void * _a, const void * _b)
     const client *a = (const client *) _a;
     const client *b = (const client *) _b;
 
-    if (a->fd == b->fd)
+    if (a->fd_mgmt == b->fd_mgmt)
         return true;
     else
         return false;

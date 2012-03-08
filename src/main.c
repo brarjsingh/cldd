@@ -33,7 +33,7 @@
 /* function prototypes */
 void signal_handler (int sig);
 void * client_manager (void *data);
-void read_fds (server *s);
+void process_events (server *s);
 
 pthread_t master_thread;
 pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -150,16 +150,8 @@ client_manager (void *data)
     /* set up as a tcp server */
     server_init_tcp (s);
 
-    /* reate the epoll file descriptor */
-    s->epoll_fd = epoll_create (EPOLL_QUEUE_LEN);
-    if (s->epoll_fd == -1)
-        CLDD_ERROR("epoll_create() error");
-
-    /* Add the server socket to the epoll event loop */
-    s->event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
-    s->event.data.fd = s->fd;
-    if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, s->fd, &s->event) == -1)
-        CLDD_ERROR("epoll_ctl() error");
+    /* set the server up to use epoll */
+    server_init_epoll (s);
 
     for (;running;)
     {
@@ -169,9 +161,11 @@ client_manager (void *data)
 
         if (s->num_fds < 0)
             CLDD_ERROR("Error while epoll_wait()");
-
-        /* data is available on one or more sockets */
-        read_fds (s);
+        else if (s->num_fds == 0)
+            continue;
+        else
+            /* data is available on one or more sockets */
+            process_events (s);
     }
 
     CLDD_MESSAGE("Exiting the client manager");
@@ -181,14 +175,14 @@ client_manager (void *data)
 }
 
 /**
- * read_fds
+ * process_events
  *
  * ...
  *
  * @param s The server data containing the epoll events to handle
  */
 void
-read_fds (server *s)
+process_events (server *s)
 {
     int i, ret;
     client *c = NULL;
@@ -216,46 +210,36 @@ read_fds (server *s)
                 c->sa_len = sizeof (c->sa);
 
                 CLDD_MESSAGE("Client connection requested");
-                c->fd = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
-                if (c->fd == -1)
+                c->fd_mgmt = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
+                if (c->fd_mgmt == -1)
                 {
-                    if ((errno == EAGAIN) ||
-                        (errno == EWOULDBLOCK))
-                    {
+                    if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
                         /* all incoming connections have been processed */
                         break;
-                    }
                     else
-                    {
-                        CLDD_ERROR("accept");
-                        break;
-                    }
+                        CLDD_ERROR("Client connection failed");
                 }
 
-                CLDD_MESSAGE("Received connection from (%s, %d)",
-                             inet_ntoa (c->sa.sin_addr),
-                             ntohs (c->sa.sin_port));
+                ret = getnameinfo (&c->sa, c->sa_len,
+                                   c->hbuf, sizeof (c->hbuf),
+                                   c->sbuf, sizeof (c->sbuf),
+                                   NI_NUMERICHOST | NI_NUMERICSERV);
+                if (ret == 0)
+                {
+                      CLDD_MESSAGE("Received connection on descriptor %d (%s:%s)",
+                                   c->fd_mgmt, c->hbuf, c->sbuf);
+                }
+
+//                CLDD_MESSAGE("Received connection from (%s, %d)",
+//                             inet_ntoa (c->sa.sin_addr),
+//                             ntohs (c->sa.sin_port));
 
                 /* make the new fd non-blocking */
-                set_nonblocking (c->fd);
+                set_nonblocking (c->fd_mgmt);
 
+                /* add the new client to the server */
                 ret = pthread_mutex_lock (&s->data_lock);
-
-                /* update counters */
-                s->n_clients++;
-                s->n_max_connected = (s->n_clients > s->n_max_connected)
-                                    ? s->n_clients : s->n_max_connected;
-
-                /* add the new socket descriptor to the epoll loop */
-                s->event.data.fd = c->fd;
-                if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, c->fd, &s->event) == -1)
-                    CLDD_ERROR("epoll_ctl() error");
-
-                /* add the client data to the linked list */
-                s->client_list = g_list_append (s->client_list, (gpointer)c);
-                CLDD_MESSAGE("Added client to list, new size: %d",
-                             g_list_length (s->client_list));
-
+                server_add_client (s, c);
                 pthread_mutex_unlock (&s->data_lock);
             }
 
@@ -269,7 +253,7 @@ read_fds (server *s)
             {
                 c = (client *)it->data;
                 next = g_list_next (it);
-                if (c->fd == s->events[i].data.fd)
+                if (c->fd_mgmt == s->events[i].data.fd)
                     break;
                 it = next;
             }
@@ -287,10 +271,10 @@ read_fds (server *s)
                              g_list_length (s->client_list));
                 /* log the client stats before closing it */
                 fprintf (s->statsfp, "%s, %d, %d, %d\n",
-                         inet_ntoa (c->sa.sin_addr), c->fd, c->nreq, c->ntot);
+                         c->hbuf, c->fd_mgmt, c->nreq, c->ntot);
                 pthread_mutex_unlock (&s->data_lock);
 
-                close (c->fd);
+                close (c->fd_mgmt);
                 client_free (c);
                 c = NULL;
             }

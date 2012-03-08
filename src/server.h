@@ -26,7 +26,7 @@
 BEGIN_C_DECLS
 
 #include "cldd.h"
-#include "adt.h"
+#include "client.h"
 
 typedef struct _server server;
 
@@ -55,6 +55,8 @@ struct _server {
 
 server * server_new (void);
 void server_init_tcp (server *s);
+void server_init_epoll (server *s);
+void server_add_client (server *s, client *c);
 void server_free (server *s);
 
 END_C_DECLS

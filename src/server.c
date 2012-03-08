@@ -50,32 +50,80 @@ server_new (void)
 void
 server_init_tcp (server *s)
 {
-    const int on = 1;
-    struct sockaddr_in servaddr;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    char port[6];
+    int ret;
 
-    /* create TCP socket to listen for client connections */
-    CLDD_MESSAGE("Creating TCP socket");
-    s->fd = socket (AF_INET, SOCK_STREAM, 0);
-    if (s->fd < 0)
-        CLDD_ERROR("Socket creation");
+    memset (&hints, 0, sizeof (struct addrinfo));
+    hints.ai_family = AF_UNSPEC;     /* return IPv4 and IPv6 choices */
+    hints.ai_socktype = SOCK_STREAM; /* want a TCP socket */
+    hints.ai_flags = AI_PASSIVE;     /* all interfaces */
 
-    /* set the socket to allow re-bind without wait issues */
-    setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (int));
+    sprintf (port, "%d", s->port);
+    ret = getaddrinfo (NULL, port, &hints, &result);
+    if (ret != 0)
+        CLDD_ERROR("getaddrinfo: %s", gai_strerror (ret));
+
+    for (rp = result; rp != NULL; rp = rp->ai_next)
+    {
+        s->fd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (s->fd == -1)
+            continue;
+
+        ret = bind (s->fd, rp->ai_addr, rp->ai_addrlen);
+        if (ret == 0)
+            /* managed to bind successfully */
+            break;
+
+        close (s->fd);
+    }
+
+    if (rp == NULL)
+        CLDD_ERROR("Unable to bind socket");
 
     /* make the server socket non-blocking */
     set_nonblocking (s->fd);
 
-    bzero (&servaddr, sizeof (servaddr));
-    servaddr.sin_family      = AF_INET;
-    servaddr.sin_addr.s_addr = htonl (INADDR_ANY);
-    servaddr.sin_port        = htons (s->port);
-
-    if (bind (s->fd, (struct sockaddr *) &servaddr, sizeof (servaddr)) < 0)
-        CLDD_ERROR("Failed to bind socket %ld", s->fd);
+    freeaddrinfo (result);
 
     /* setup the socket for incoming connections */
     if (listen (s->fd, BACKLOG) < 0)
         CLDD_ERROR("Unable to listen on socket %ld", s->fd);
+}
+
+void
+server_init_epoll (server *s)
+{
+    /* create the epoll file descriptor */
+    s->epoll_fd = epoll_create (EPOLL_QUEUE_LEN);
+    if (s->epoll_fd == -1)
+        CLDD_ERROR("epoll_create() error");
+
+    /* Add the server socket to the epoll event loop */
+    s->event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
+    s->event.data.fd = s->fd;
+    if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, s->fd, &s->event) == -1)
+        CLDD_ERROR("epoll_ctl() error");
+}
+
+void
+server_add_client (server *s, client *c)
+{
+    /* update counters */
+    s->n_clients++;
+    s->n_max_connected = (s->n_clients > s->n_max_connected)
+                        ? s->n_clients : s->n_max_connected;
+
+    /* add the new socket descriptor to the epoll loop */
+    s->event.data.fd = c->fd_mgmt;
+    if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, c->fd_mgmt, &s->event) == -1)
+        CLDD_ERROR("epoll_ctl() error");
+
+    /* add the client data to the linked list */
+    s->client_list = g_list_append (s->client_list, (gpointer)c);
+    CLDD_MESSAGE("Added client to list, new size: %d",
+                 g_list_length (s->client_list));
 }
 
 void
