@@ -53,11 +53,52 @@ struct _server {
     char *log_filename;
 };
 
+/**
+ * server_new
+ */
 server * server_new (void);
-void server_init_tcp (server *s);
-void server_init_epoll (server *s);
-void server_add_client (server *s, client *c);
+
+/**
+ * server_free
+ */
 void server_free (server *s);
+
+/**
+ * server_init_tcp
+ */
+void server_init_tcp (server *s);
+
+/**
+ * server_init_epoll
+ */
+void server_init_epoll (server *s);
+
+/**
+ * server_add_client
+ */
+void server_add_client (server *s, client *c);
+
+/**
+ * server_connect_client
+ *
+ * Perform the client connection setup.
+ *
+ * @param s Server data to connect client to
+ * @param c Client to connect
+ * @return 0 on success, 1 if there's no connection request, -1 on error
+ */
+int server_connect_client (server *s, client *c);
+
+/**
+ * server_next_stream_port
+ *
+ * Iterate through the list of clients and get the next available port number
+ * to use to setup a streaming socket.
+ *
+ * @param s
+ * @return
+ */
+int server_next_stream_port (server *s);
 
 END_C_DECLS
 

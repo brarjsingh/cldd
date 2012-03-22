@@ -20,6 +20,7 @@
 
 #include <common.h>
 
+#include "cldd.h"
 #include "cmdline.h"
 #include "conf.h"
 #include "error.h"
@@ -82,7 +83,7 @@ parse_cmdline (int argc, char **argv, struct options *options)
     };
 
     /* set defaults */
-    options->port = 10000;
+    options->port = DEFAULT_PORT;
     options->log_filename = malloc (sizeof (32));
     strcpy (options->log_filename, "log.dat");
 

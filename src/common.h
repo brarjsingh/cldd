@@ -65,8 +65,10 @@
 #include <pthread.h>
 #include <linux/limits.h>
 
-/* gave up and included glib for top and adt implementations */
 #include <glib.h>
+#include <libxml/tree.h>
+#include <cldd-0.1/cldd.h>
+#include <cldd-0.1/cmd.h>
 
 #ifndef EXIT_SUCCESS
 #  define EXIT_SUCCESS  0

@@ -48,6 +48,22 @@ server_new (void)
 }
 
 void
+server_free (server *s)
+{
+    /* clear the data for the collections */
+    g_list_free (s->client_list);
+
+    /* destroy the locks */
+    pthread_mutex_destroy (&s->data_lock);
+
+    /* string should be guaranteed to contain a value */
+    free (s->log_filename);
+
+    /* finally clean up the server allocation */
+    free (s);
+}
+
+void
 server_init_tcp (server *s)
 {
     struct addrinfo hints;
@@ -126,18 +142,69 @@ server_add_client (server *s, client *c)
                  g_list_length (s->client_list));
 }
 
-void
-server_free (server *s)
+int
+server_connect_client (server *s, client *c)
 {
-    /* clear the data for the collections */
-    g_list_free (s->client_list);
+    int ret;
 
-    /* destroy the locks */
-    pthread_mutex_destroy (&s->data_lock);
+    c->fd_mgmt = accept (s->fd, (struct sockaddr *)&c->sa, &c->sa_len);
+    if (c->fd_mgmt == -1)
+    {
+        if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
+            return 1;
+        else
+            return -1;
+    }
 
-    /* string should be guaranteed to contain a value */
-    free (s->log_filename);
+    ret = getnameinfo (&c->sa, c->sa_len,
+                        c->hbuf, sizeof (c->hbuf),
+                        c->sbuf, sizeof (c->sbuf),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
 
-    /* finally clean up the server allocation */
-    free (s);
+    /* make the new fd non-blocking */
+    set_nonblocking (c->fd_mgmt);
+
+    /* setup stream properties */
+    c->stream->port = server_next_stream_port (s);
+    c->stream->guest = g_strdup_printf ("%s", c->hbuf);
+
+    return 0;
 }
+
+int
+server_next_stream_port (server *s)
+{
+    int i;
+    bool found = false;
+    client *c = NULL;
+    GList *it, *next;
+
+    /* 10000 is ridiculous and not what this server is intended to handle */
+    for (i = STREAM_PORT_BASE; i < STREAM_PORT_BASE+10000; i++)
+    {
+        CLDD_MESSAGE("Checking for port %d availability", i);
+
+        /* go through the available connections */
+        it = s->client_list;
+        while (it != NULL)
+        {
+            c = (client *)it->data;
+            next = g_list_next (it);
+            if (c->stream->port == i)
+            {
+                found = true;
+                break;
+            }
+            it = next;
+        }
+
+        if (!found)
+        {
+            CLDD_MESSAGE("Using port %d for new client stream", i);
+            return i;
+        }
+    }
+
+    return -1;
+}
+

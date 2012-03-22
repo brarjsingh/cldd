@@ -12,12 +12,16 @@ cldd_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GLIBTOP_CFLAGS) \
+	$(CLD_CFLAGS) \
+	$(XML_CFLAGS) \
 	$(CLDD_CFLAGS)
 
 cldd_LDADD = \
 	$(CLDD_LIBS) \
 	$(GLIB_LIBS) \
 	$(GLIBTOP_LIBS) \
+	$(CLD_LIBS) \
+	$(XML_LIBS) \
 	$(INTLLIBS)
 
 cldd_headers = \
@@ -31,6 +35,7 @@ cldd_headers = \
 	error.h \
 	log.h \
 	server.h \
+	stream.h \
 	utils.h
 
 cldd_SOURCES = \
@@ -44,6 +49,7 @@ cldd_SOURCES = \
 	error.c \
 	log.c \
 	server.c \
+	stream.c \
 	utils.c
 
 noinst_HEADERS =

@@ -28,6 +28,7 @@
 #include "error.h"
 #include "log.h"
 #include "server.h"
+#include "stream.h"
 #include "utils.h"
 
 /* function prototypes */
@@ -129,7 +130,8 @@ signal_handler (int sig)
 
     /* condition to exit the main thread */
     running = false;
-    pthread_cancel (master_thread);
+    pthread_join (master_thread, NULL);
+//    pthread_cancel (master_thread);
 }
 
 /**
@@ -177,7 +179,7 @@ client_manager (void *data)
 /**
  * process_events
  *
- * ...
+ * Process edge triggered events seen by epoll.
  *
  * @param s The server data containing the epoll events to handle
  */
@@ -203,39 +205,25 @@ process_events (server *s)
          * incoming connections */
         if (s->events[i].data.fd == s->fd)
         {
+            CLDD_MESSAGE("Client connection requested");
             while (true)
             {
                 /* create new client data */
                 c = client_new ();
                 c->sa_len = sizeof (c->sa);
 
-                CLDD_MESSAGE("Client connection requested");
-                c->fd_mgmt = accept (s->fd, (struct sockaddr *) &c->sa, &c->sa_len);
-                if (c->fd_mgmt == -1)
-                {
-                    if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
-                        /* all incoming connections have been processed */
-                        break;
-                    else
-                        CLDD_ERROR("Client connection failed");
-                }
+                ret = server_connect_client (s, c);
+                if (ret == -1)
+                    CLDD_ERROR("Client connection failed");
+                else if (ret == 1)
+                    /* all incoming connections have been processed */
+                    break;
+                else
+                    CLDD_MESSAGE("Received connection on descriptor %d (%s:%s)",
+                                 c->fd_mgmt, c->hbuf, c->sbuf);
 
-                ret = getnameinfo (&c->sa, c->sa_len,
-                                   c->hbuf, sizeof (c->hbuf),
-                                   c->sbuf, sizeof (c->sbuf),
-                                   NI_NUMERICHOST | NI_NUMERICSERV);
-                if (ret == 0)
-                {
-                      CLDD_MESSAGE("Received connection on descriptor %d (%s:%s)",
-                                   c->fd_mgmt, c->hbuf, c->sbuf);
-                }
-
-//                CLDD_MESSAGE("Received connection from (%s, %d)",
-//                             inet_ntoa (c->sa.sin_addr),
-//                             ntohs (c->sa.sin_port));
-
-                /* make the new fd non-blocking */
-                set_nonblocking (c->fd_mgmt);
+                /* add a streaming output socket to the client */
+                stream_open (c->stream);
 
                 /* add the new client to the server */
                 ret = pthread_mutex_lock (&s->data_lock);
@@ -273,6 +261,8 @@ process_events (server *s)
                 fprintf (s->statsfp, "%s, %d, %d, %d\n",
                          c->hbuf, c->fd_mgmt, c->nreq, c->ntot);
                 pthread_mutex_unlock (&s->data_lock);
+
+                stream_close (c->stream);
 
                 close (c->fd_mgmt);
                 client_free (c);

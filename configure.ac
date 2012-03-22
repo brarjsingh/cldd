@@ -120,6 +120,12 @@ PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.6],,
 PKG_CHECK_MODULES([GLIBTOP], [libgtop-2.0],,
 	[AC_MSG_ERROR([libgtop-2.0 is required])])
 
+PKG_CHECK_MODULES([XML], [libxml-2.0],,
+	[AC_MSG_ERROR([libxml-2.0 is required])])
+
+PKG_CHECK_MODULES([CLD], [cldd-0.1],,
+	[AC_MSG_ERROR([libcldd-0.1 is required])])
+
 dnl ---------------------------------------------------------------------------
 dnl Allow tools to be specifically built
 dnl ---------------------------------------------------------------------------

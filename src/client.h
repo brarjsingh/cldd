@@ -26,29 +26,64 @@
 BEGIN_C_DECLS
 
 #include "cldd.h"
+#include "stream.h"
 
-extern const char sendbuf[MAXLINE];
+extern const gchar sendbuf[MAXLINE];
 
 typedef struct _client client;
 
 struct _client {
-    int fd_mgmt;
-    int fd_strm;
-//    struct sockaddr_in sa;
+    bool quit;
+    int fd_mgmt;        /* socket to use for commands and management */
+    int fd_chan;        /* socket to stream data to client with */
     struct sockaddr sa;
     socklen_t sa_len;
-    char hbuf[NI_MAXHOST];
-    char sbuf[NI_MAXSERV];
+    gchar hbuf[NI_MAXHOST];
+    gchar sbuf[NI_MAXSERV];
     /* for stats logging */
     int nreq;
     int ntot;
-    bool quit;
+    /* stream for communicating with client */
+    struct stream_t *stream;
 };
 
+/**
+ * client_new
+ *
+ * Allocate memory for a client struct.
+ *
+ * @return New client data
+ */
 client * client_new (void);
-void client_process_cmd (client *c);
-bool client_compare (const void * _a, const void * _b);
+
+/**
+ * client_free
+ *
+ * Frees up the memory that was allocated for the client data.
+ *
+ * @param data Client to be freed from memory
+ */
 void client_free (gpointer data);
+
+/**
+ * client_process_cmd
+ *
+ * Processes the current client command that triggered an event.
+ *
+ * @param c The client data containing the file descriptor to write to.
+ */
+void client_process_cmd (client *c);
+
+/**
+ * client_compare
+ *
+ * Compare function for use with the ADTs for cleanup etc.
+ *
+ * @param _a First value for comparison
+ * @param _b Second value for comparison
+ * @return A true/false value depending on whether or not they are the same
+ */
+bool client_compare (const void * _a, const void * _b);
 
 END_C_DECLS
 

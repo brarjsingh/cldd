@@ -27,9 +27,11 @@ BEGIN_C_DECLS
 
 #include "cmdline.h"
 
-#define MAXLINE         4096        /* max text line length */
-#define BACKLOG         1024
-#define EPOLL_QUEUE_LEN 256
+#define MAXLINE             4096        /* max text line length */
+#define BACKLOG             1024
+#define EPOLL_QUEUE_LEN     256
+#define DEFAULT_PORT        10000
+#define STREAM_PORT_BASE    10500
 
 /* replace later with value taken from configuration file */
 #define PID_FILE    "/var/run/cldd.pid"
