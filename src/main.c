@@ -34,7 +34,7 @@
 /* function prototypes */
 void signal_handler (int sig);
 void * client_manager (void *data);
-void process_events (server *s);
+static void process_events (server *s);
 
 pthread_t master_thread;
 pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -183,7 +183,7 @@ client_manager (void *data)
  *
  * @param s The server data containing the epoll events to handle
  */
-void
+static void
 process_events (server *s)
 {
     int i, ret;
@@ -222,13 +222,13 @@ process_events (server *s)
                     CLDD_MESSAGE("Received connection on descriptor %d (%s:%s)",
                                  c->fd_mgmt, c->hbuf, c->sbuf);
 
-                /* add a streaming output socket to the client */
-                stream_open (c->stream);
-
                 /* add the new client to the server */
                 ret = pthread_mutex_lock (&s->data_lock);
                 server_add_client (s, c);
                 pthread_mutex_unlock (&s->data_lock);
+
+                /* add a streaming output socket to the client */
+                stream_open (c->stream);
             }
 
             continue;

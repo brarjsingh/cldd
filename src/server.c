@@ -25,6 +25,7 @@
 #include "client.h"
 #include "error.h"
 #include "server.h"
+#include "stream.h"
 
 server *
 server_new (void)

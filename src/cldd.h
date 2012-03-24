@@ -36,6 +36,9 @@ BEGIN_C_DECLS
 /* replace later with value taken from configuration file */
 #define PID_FILE    "/var/run/cldd.pid"
 
+/* the main execution loop */
+extern GMainLoop *main_loop;
+
 /* this needs to be global for error functions */
 extern struct options options;
 extern bool running;

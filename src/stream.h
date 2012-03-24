@@ -27,7 +27,7 @@ BEGIN_C_DECLS
 
 struct stream_t {
     int port;
-    int sd;
+    int fd;
     bool open;
     gchar *guest;
     pthread_t task;

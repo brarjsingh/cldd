@@ -29,6 +29,7 @@ stream_new (void)
 {
     struct stream_t *s = g_malloc (sizeof (struct stream_t));
 
+    s->guest = g_malloc (MAXLINE * sizeof (gchar));
     pthread_mutex_init (&s->lock, NULL);
     pthread_cond_init (&s->cond, NULL);
 
@@ -44,47 +45,61 @@ stream_free (struct stream_t *s)
     free (s);
 }
 
+static void
+stream_init_tcp (struct stream_t *s)
+{
+    int ret, set = 1;
+    char port[6];
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+
+    memset (&hints, 0, sizeof (struct addrinfo));
+    hints.ai_family = AF_UNSPEC;     /* return IPv4 and IPv6 choices */
+    hints.ai_socktype = SOCK_STREAM; /* want a TCP socket */
+    hints.ai_flags = AI_PASSIVE;     /* all interfaces */
+
+    /* FIXME: change to snprintf */
+    sprintf (port, "%d", s->port);
+    ret = getaddrinfo (NULL, port, &hints, &result);
+    if (ret != 0)
+        CLDD_ERROR("getaddrinfo: %s", gai_strerror (ret));
+
+    for (rp = result; rp != NULL; rp = rp->ai_next)
+    {
+        s->fd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (s->fd == -1)
+            continue;
+
+        /* prevent SIGPIPE on write to closed socket
+         * TODO: check return type on these for -1 and post error */
+//        setsockopt (s->fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof (int));
+//        setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, (void *)&set, sizeof (int));
+
+        ret = bind (s->fd, rp->ai_addr, rp->ai_addrlen);
+        if (ret == 0)
+            /* managed to bind successfully */
+            break;
+
+        close (s->fd);
+    }
+
+    if (rp == NULL)
+        CLDD_ERROR("Unable to bind socket");
+
+    /* make the streaming socket non-blocking */
+//    set_nonblocking (s->fd);
+
+    freeaddrinfo (result);
+
+    /* setup the socket for incoming connections */
+    if (listen (s->fd, BACKLOG) < 0)
+        CLDD_ERROR("Unable to listen on socket %ld", s->fd);
+}
+
 void
 stream_open (struct stream_t *s)
 {
-    int n, rv;
-    gchar *strport;
-    struct addrinfo hints, *servinfo, *p;
-
-    memset (&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-
-    /* need the port number as a string for getaddrinfo */
-    strport = g_strdup_printf ("%d", s->port);
-
-    if ((rv = getaddrinfo (s->guest, strport, &hints, &servinfo)) != 0)
-    {
-        g_fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rv));
-        return;
-    }
-
-    /* loop through all the results and bind to the first we can */
-    for (p = servinfo; p != NULL; p = p->ai_next)
-    {
-        if ((s->sd = socket (p->ai_family,
-                             p->ai_socktype,
-                             p->ai_protocol)) == -1)
-        {
-            perror ("output stream: socket");
-            continue;
-        }
-
-        break;
-    }
-
-    if (p == NULL)
-    {
-        g_fprintf (stderr, "output stream: failed to bind socket\n");
-        return;
-    }
-
-    freeaddrinfo (servinfo);
+    stream_init_tcp (s);
 
     /* the port is open, start listening for data */
     s->open = true;
@@ -96,16 +111,28 @@ stream_close (struct stream_t *s)
 {
     s->open = false;
     pthread_join (s->task, NULL);
-    close (s->sd);
+    close (s->fd);
 }
 
 void *
 stream_thread (void *data)
 {
-    int ret, n;
+    int ret, n, fd;
     struct timespec ts;
     gchar buf[MAXLINE];
+    struct sockaddr_storage stream_addr;
+    socklen_t sin_size;
     struct stream_t *s = (struct stream_t *)data;
+
+    sin_size = sizeof stream_addr;
+    fd = accept (s->fd, (struct sockaddr *)&stream_addr, &sin_size);
+    if (fd == -1)
+    {
+        CLDD_MESSAGE("Stream socket accept failed: %s", strerror (errno));
+        s->open = false;
+    }
+
+//    set_nonblocking (fd);
 
     for (;s->open;)
     {
@@ -133,7 +160,7 @@ stream_thread (void *data)
 
         /* transmit current data */
         g_snprintf (buf, MAXLINE, "$12:00:00.000&0|0.000,1|0.000,2|0.000\n");
-        if ((n = writen (s->sd, buf, strlen (buf))) != strlen (buf))
+        if ((n = writen (fd, buf, strlen (buf))) != strlen (buf))
             CLDD_MESSAGE("Client write error - %d != %d", strlen (buf), n);
     }
 
