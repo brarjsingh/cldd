@@ -30,9 +30,7 @@ struct stream_t {
     int fd;
     bool open;
     gchar *guest;
-    pthread_t task;
-    pthread_mutex_t lock;
-    pthread_cond_t cond;
+    GThread *task;
 };
 
 /**

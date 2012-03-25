@@ -39,11 +39,7 @@ server_new (void)
     s->n_max_connected = 0;
 
     /* create the mutexes for controlling access to thread data */
-    if (pthread_mutex_init (&s->data_lock, NULL) != 0)
-    {
-        free (s);
-        return NULL;
-    }
+    s->data_lock = g_mutex_new ();
 
     return s;
 }
@@ -55,7 +51,7 @@ server_free (server *s)
     g_list_free (s->client_list);
 
     /* destroy the locks */
-    pthread_mutex_destroy (&s->data_lock);
+    g_mutex_free (s->data_lock);
 
     /* string should be guaranteed to contain a value */
     free (s->log_filename);
@@ -70,7 +66,7 @@ server_init_tcp (server *s)
     struct addrinfo hints;
     struct addrinfo *result, *rp;
     char port[6];
-    int ret;
+    int ret, yes = 1;
 
     memset (&hints, 0, sizeof (struct addrinfo));
     hints.ai_family = AF_UNSPEC;     /* return IPv4 and IPv6 choices */
@@ -87,6 +83,10 @@ server_init_tcp (server *s)
         s->fd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (s->fd == -1)
             continue;
+
+        if (setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                        sizeof(int)) == -1)
+            CLDD_MESSAGE("Failed to set socket option SO_REUSEADDR");
 
         ret = bind (s->fd, rp->ai_addr, rp->ai_addrlen);
         if (ret == 0)
@@ -118,7 +118,7 @@ server_init_epoll (server *s)
         CLDD_ERROR("epoll_create() error");
 
     /* Add the server socket to the epoll event loop */
-    s->event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
+    s->event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLPRI;
     s->event.data.fd = s->fd;
     if (epoll_ctl (s->epoll_fd, EPOLL_CTL_ADD, s->fd, &s->event) == -1)
         CLDD_ERROR("epoll_ctl() error");
@@ -165,45 +165,61 @@ server_connect_client (server *s, client *c)
     /* make the new fd non-blocking */
     set_nonblocking (c->fd_mgmt);
 
-    /* setup stream properties */
-    c->stream->port = server_next_stream_port (s);
-    c->stream->guest = g_strdup_printf ("%s", c->hbuf);
-
     return 0;
+}
+
+void
+server_close_clients (server *s)
+{
+    client *c = NULL;
+    GList *it, *next;
+
+    /* go through the list of clients */
+    it = s->client_list;
+    while (it != NULL)
+    {
+        c = (client *)it->data;
+        next = g_list_next (it);
+        CLDD_MESSAGE("Closing client connection");
+        s->n_clients--;
+        s->client_list = g_list_delete_link (s->client_list, it);
+        if (c->stream->open)
+            stream_close (c->stream);
+        close (c->fd_mgmt);
+        client_free (c);
+        it = next;
+    }
 }
 
 int
 server_next_stream_port (server *s)
 {
-    int i;
-    bool found = false;
+    int port;
     client *c = NULL;
     GList *it, *next;
 
-    /* 10000 is ridiculous and not what this server is intended to handle */
-    for (i = STREAM_PORT_BASE; i < STREAM_PORT_BASE+10000; i++)
+    port = STREAM_PORT_BASE;
+
+    /* go through the list of clients */
+    it = s->client_list;
+    while (it != NULL)
     {
-        CLDD_MESSAGE("Checking for port %d availability", i);
+        CLDD_MESSAGE("Checking for port %d availability", port);
+        c = (client *)it->data;
+        next = g_list_next (it);
 
-        /* go through the available connections */
-        it = s->client_list;
-        while (it != NULL)
+        if (c->stream->port == port)
         {
-            c = (client *)it->data;
-            next = g_list_next (it);
-            if (c->stream->port == i)
-            {
-                found = true;
+            port++;
+            /* 10000 is ridiculous and not what this server is intended to
+             * handle, should come from client limit in the server setup */
+            if (port == STREAM_PORT_BASE+10000)
                 break;
-            }
             it = next;
+            continue;
         }
-
-        if (!found)
-        {
-            CLDD_MESSAGE("Using port %d for new client stream", i);
-            return i;
-        }
+        else
+            return port;
     }
 
     return -1;

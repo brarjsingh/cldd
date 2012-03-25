@@ -51,22 +51,26 @@ daemonize_kill (void)
     int pid, ret;
 
     if (pidfile == NULL)
-        CLDD_ERROR("no pid_file specified in the config file");
+        CLDD_ERROR("No pid_file specified in the config file");
 
     fp = fopen (pidfile, "r");
     if (fp == NULL)
-        CLDD_ERROR("unable to open pid file \"%s\": %s",
+        CLDD_ERROR("Unable to open pid file \"%s\": %s",
                    pidfile, strerror (errno));
 
     if (fscanf (fp, "%i", &pid) != 1)
-        CLDD_ERROR("unable to read the pid from file \"%s\"", pidfile);
+        CLDD_ERROR("Unable to read the pid from file \"%s\"", pidfile);
 
-    fclose(fp);
+    fclose (fp);
+
+    /* immediately stop the epoll wait */
+    ret = kill (pid, SIGHUP);
+    if (ret < 0)
+        CLDD_ERROR("Unable to stop the epoll call: %s", strerror (errno));
 
     ret = kill (pid, SIGTERM);
     if (ret < 0)
-        CLDD_ERROR("unable to kill proccess %i: %s",
-                   pid, strerror (errno));
+        CLDD_ERROR("unable to kill proccess %i: %s", pid, strerror (errno));
 
     exit (EXIT_SUCCESS);
 }
@@ -144,14 +148,14 @@ daemonize_detach (void)
 
     /* release the current working directory */
     if (chdir ("/") < 0)
-        CLDD_ERROR("problems changing to root directory");
+        CLDD_ERROR("Problems changing to root directory");
 
     /* detach from the current session */
     setsid ();
 
 #else
 
-    CLDD_ERROR("no support for daemonizing");
+    CLDD_ERROR("No support for daemonizing");
 
 #endif
 
@@ -167,11 +171,11 @@ daemonize (bool detach)
     {
         /* do this before daemon'izing so we can fail gracefully if we can't
          * write to the pid file */
-        fprintf (stderr, "opening pid file\n");
+        CLDD_MESSAGE("Opening pid file");
         fp = fopen (pidfile, "w+");
         if (!fp)
         {
-            CLDD_ERROR("could not create pid file \"%s\": %s",
+            CLDD_ERROR("Could not create pid file \"%s\": %s",
                        pidfile, strerror (errno));
         }
     }
@@ -181,7 +185,7 @@ daemonize (bool detach)
 
     if (pidfile != NULL)
     {
-        fprintf (stderr, "writing pid file\n");
+        CLDD_MESSAGE("Writing pid file");
         fprintf (fp, "%lu\n", (unsigned long)getpid ());
         fclose (fp);
     }

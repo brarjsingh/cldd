@@ -28,19 +28,13 @@ struct stream_t *
 stream_new (void)
 {
     struct stream_t *s = g_malloc (sizeof (struct stream_t));
-
     s->guest = g_malloc (MAXLINE * sizeof (gchar));
-    pthread_mutex_init (&s->lock, NULL);
-    pthread_cond_init (&s->cond, NULL);
-
     return s;
 }
 
 void
 stream_free (struct stream_t *s)
 {
-    pthread_mutex_destroy (&s->lock);
-    pthread_cond_destroy (&s->cond);
     free (s->guest);
     free (s);
 }
@@ -48,7 +42,7 @@ stream_free (struct stream_t *s)
 static void
 stream_init_tcp (struct stream_t *s)
 {
-    int ret, set = 1;
+    int ret, yes = 1;
     char port[6];
     struct addrinfo hints;
     struct addrinfo *result, *rp;
@@ -70,10 +64,9 @@ stream_init_tcp (struct stream_t *s)
         if (s->fd == -1)
             continue;
 
-        /* prevent SIGPIPE on write to closed socket
-         * TODO: check return type on these for -1 and post error */
-//        setsockopt (s->fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof (int));
-//        setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, (void *)&set, sizeof (int));
+        if (setsockopt (s->fd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                        sizeof(int)) == -1)
+            CLDD_MESSAGE("Failed to set socket option SO_REUSEADDR");
 
         ret = bind (s->fd, rp->ai_addr, rp->ai_addrlen);
         if (ret == 0)
@@ -99,30 +92,38 @@ stream_init_tcp (struct stream_t *s)
 void
 stream_open (struct stream_t *s)
 {
+    GError *error;
+
     stream_init_tcp (s);
 
     /* the port is open, start listening for data */
     s->open = true;
-    pthread_create (&s->task, NULL, stream_thread, (void *)s);
+    s->task = g_thread_create ((GThreadFunc)stream_thread,
+                               (gpointer)s, true, &error);
+
 }
 
 void
 stream_close (struct stream_t *s)
 {
     s->open = false;
-    pthread_join (s->task, NULL);
+    g_thread_join (s->task);
     close (s->fd);
 }
 
 void *
-stream_thread (void *data)
+stream_thread (gpointer data)
 {
-    int ret, n, fd;
-    struct timespec ts;
+    struct stream_t *s = (struct stream_t *)data;
+
+    int ret, n, fd, delay;
     gchar buf[MAXLINE];
     struct sockaddr_storage stream_addr;
     socklen_t sin_size;
-    struct stream_t *s = (struct stream_t *)data;
+
+    static GStaticMutex lock = G_STATIC_MUTEX_INIT;
+    GCond *cond = g_cond_new ();
+    GTimeVal next_time;
 
     sin_size = sizeof stream_addr;
     fd = accept (s->fd, (struct sockaddr *)&stream_addr, &sin_size);
@@ -134,37 +135,30 @@ stream_thread (void *data)
 
 //    set_nonblocking (fd);
 
-    for (;s->open;)
+    /* 10Hz timer setup (in usec) */
+    delay = 1e6/10;
+    g_get_current_time (&next_time);
+
+    while (s->open)
     {
-        pthread_mutex_lock (&s->lock);
-
-        /* setup timer for 10Hz */
-        clock_gettime (CLOCK_REALTIME, &ts);
-        ts.tv_sec += 0;
-        ts.tv_nsec += 100000000;
-        if (ts.tv_nsec >= 1000000000)
-        {
-            ts.tv_sec++;
-            ts.tv_nsec -= 1000000000;
-        }
-
-        /* wait for the set time */
-        ret = pthread_cond_timedwait (&s->cond, &s->lock, &ts);
-        if ((ret != 0) && (ret != ETIMEDOUT))
-        {
-            CLDD_MESSAGE("pthread_cond_timedwait() returned %d\n", ret);
-            pthread_mutex_unlock (&s->lock);
-            break;
-        }
-        pthread_mutex_unlock (&s->lock);
-
         /* transmit current data */
         g_snprintf (buf, MAXLINE, "$12:00:00.000&0|0.000,1|0.000,2|0.000\n");
         if ((n = writen (fd, buf, strlen (buf))) != strlen (buf))
-            CLDD_MESSAGE("Client write error - %d != %d", strlen (buf), n);
+            CLDD_MESSAGE("Client write error: %s", strerror (errno));
+
+        if (errno == ECONNRESET)
+            s->open = false;
+
+        /* add another time delay */
+        g_time_val_add (&next_time, delay);
+        g_static_mutex_lock (&lock);
+        while (g_cond_timed_wait (cond,
+                                  g_static_mutex_get_mutex (&lock),
+                                  &next_time))
+            ;   /* do nothing */
+        g_static_mutex_unlock (&lock);
     }
 
-    pthread_mutex_unlock (&s->lock);
-
-    pthread_exit (NULL);
+    g_cond_free (cond);
+    g_thread_exit (NULL);
 }

@@ -36,19 +36,14 @@ struct proc_stat_t {
     long long int iowait;
 };
 
-extern pthread_t       logging_thread;
-extern pthread_cond_t  log_timer_cond;
-extern pthread_mutex_t log_timer_mutex;
-
-/* these are going to seem unnecessary at first,
- * they are intended for later development */
+extern GThread *log_task;
 
 /* TODO: create struct log and replace server in function parameters */
 
 void log_init (server *s, struct options *options);
 void setup_log_output (server *s);
 void close_log_files (server *s);
-void * logging_func (void *data);
+void * log_func (void *data);
 
 END_C_DECLS
 

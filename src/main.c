@@ -33,11 +33,11 @@
 
 /* function prototypes */
 void signal_handler (int sig);
-void * client_manager (void *data);
+void * client_manager (gpointer data);
 static void process_events (server *s);
 
-pthread_t master_thread;
-pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
+GMainLoop *main_loop;
+GThread *main_task;
 
 struct options options;
 bool running = true;
@@ -55,6 +55,7 @@ main (int argc, char **argv)
 {
     int ret;
     bool success;
+    GError *error;
     server *s;
 
     if (argc == 1)
@@ -77,22 +78,26 @@ main (int argc, char **argv)
     daemonize_close_stdin ();
 
     glue_daemonize_init (&options);
-    log_init (s, &options);
+//    log_init (s, &options);
 
     daemonize_set_user ();
 
     /* passing true starts daemon in detached mode */
     daemonize (options.daemon);
-    setup_log_output (s);
+//    setup_log_output (s);
 
     /* start the master thread for client management */
-    ret = pthread_create (&master_thread, NULL, client_manager, s);
-    if (ret != 0)
-        CLDD_ERROR("Unable to create client management thread");
-    pthread_join (master_thread, NULL);
+    main_task = g_thread_create ((GThreadFunc)client_manager,
+                                 (gpointer)s, true, &error);
+
+    /* enter the main loop */
+    main_loop = g_main_loop_new (NULL, false);
+    g_main_loop_run (main_loop);
+    g_thread_join (main_task);
+    g_main_loop_unref (main_loop);
 
     daemonize_finish ();
-    close_log_files (s);
+//    close_log_files (s);
 
     /* clean up */
     server_free (s);
@@ -116,22 +121,20 @@ signal_handler (int sig)
     {
         case SIGHUP:
             syslog (LOG_WARNING, "Received SIGHUP signal.");
+            /* use this to restart - later */
             break;
         case SIGTERM:
             syslog (LOG_WARNING, "Received SIGTERM signal.");
+            running = false;
             break;
         case SIGINT:
             syslog (LOG_WARNING, "Received SIGINT signal.");
+            running = false;
             break;
         default:
             syslog (LOG_WARNING, "Unhandled signal (%d) %s", strsignal(sig));
             break;
     }
-
-    /* condition to exit the main thread */
-    running = false;
-    pthread_join (master_thread, NULL);
-//    pthread_cancel (master_thread);
 }
 
 /**
@@ -142,12 +145,17 @@ signal_handler (int sig)
  * @param data Thread data for the function
  */
 void *
-client_manager (void *data)
+client_manager (gpointer data)
 {
-    int ret, nready;
+    int ret, nready, timeout = 1000;
     client *c = NULL;
     GList *it, *next;
+    sigset_t mask;
     server *s = (server *)data;
+
+    /* use SIGHUP to exit the epoll wait */
+    sigemptyset (&mask);
+    sigaddset (&mask, SIGHUP);
 
     /* set up as a tcp server */
     server_init_tcp (s);
@@ -155,14 +163,18 @@ client_manager (void *data)
     /* set the server up to use epoll */
     server_init_epoll (s);
 
-    for (;running;)
+    while (running)
     {
-        pthread_mutex_lock (&s->data_lock);
-        s->num_fds = epoll_wait (s->epoll_fd, s->events, EPOLL_QUEUE_LEN, -1);
-        pthread_mutex_unlock (&s->data_lock);
+        g_mutex_lock (s->data_lock);
+        /* timeout was added to prevent an undesirable thread condition */
+        s->num_fds = epoll_pwait (s->epoll_fd, s->events,
+                                  EPOLL_QUEUE_LEN, timeout, &mask);
+        g_mutex_unlock (s->data_lock);
 
-        if (s->num_fds < 0)
-            CLDD_ERROR("Error while epoll_wait()");
+        if (errno == EINTR)
+            break;
+        else if (s->num_fds < 0)
+            CLDD_ERROR("Error during epoll_pwait: %s", strerror (errno));
         else if (s->num_fds == 0)
             continue;
         else
@@ -171,9 +183,13 @@ client_manager (void *data)
     }
 
     CLDD_MESSAGE("Exiting the client manager");
+
+    /* close all clients */
+    server_close_clients (s);
     close (s->fd);
 
-    pthread_exit (NULL);
+    g_main_loop_quit (main_loop);
+    g_thread_exit (NULL);
 }
 
 /**
@@ -186,7 +202,8 @@ client_manager (void *data)
 static void
 process_events (server *s)
 {
-    int i, ret;
+    int i, n, ret;
+    gchar b, *buf;
     client *c = NULL;
     GList *it, *next;
 
@@ -199,6 +216,15 @@ process_events (server *s)
             close(s->events[i].data.fd);
             continue;
         }
+        /* oob data */
+        else if (s->events[i].events & EPOLLPRI)
+        {
+            /* receive a single byte */
+            recv (s->events[i].data.fd, &b, sizeof (b), MSG_OOB);
+            CLDD_MESSAGE("OOB data received: %c", b);
+            /* TODO: broadcast message to clients */
+        }
+
         assert (s->events[i].events & EPOLLIN);
 
         /* notification on listening socket indicating one or more
@@ -223,12 +249,20 @@ process_events (server *s)
                                  c->fd_mgmt, c->hbuf, c->sbuf);
 
                 /* add the new client to the server */
-                ret = pthread_mutex_lock (&s->data_lock);
+                g_mutex_lock (s->data_lock);
                 server_add_client (s, c);
-                pthread_mutex_unlock (&s->data_lock);
 
                 /* add a streaming output socket to the client */
+                c->stream->port = server_next_stream_port (s);
+                c->stream->guest = g_strdup_printf ("%s", c->hbuf);
                 stream_open (c->stream);
+                /* inform the client that the stream is open */
+                buf = g_strdup_printf ("%s\n", cmds[CMD_SRY].str);
+                n = strlen (buf);
+                if (writen (c->fd_mgmt, buf, n) != n)
+                    CLDD_MESSAGE("Client write error: SRY");
+
+                g_mutex_unlock (s->data_lock);
             }
 
             continue;
@@ -252,17 +286,18 @@ process_events (server *s)
             /* check if the client is pending quit */
             if (c->quit)
             {
-                pthread_mutex_trylock (&s->data_lock);
+                g_mutex_trylock (s->data_lock);
                 s->n_clients--;
                 s->client_list = g_list_delete_link (s->client_list, it);
                 CLDD_MESSAGE("Removed client from list, new size: %d",
                              g_list_length (s->client_list));
                 /* log the client stats before closing it */
-                fprintf (s->statsfp, "%s, %d, %d, %d\n",
-                         c->hbuf, c->fd_mgmt, c->nreq, c->ntot);
-                pthread_mutex_unlock (&s->data_lock);
+                //fprintf (s->statsfp, "%s, %d, %d, %d\n",
+                //         c->hbuf, c->fd_mgmt, c->nreq, c->ntot);
+                g_mutex_unlock (s->data_lock);
 
-                stream_close (c->stream);
+                if (c->stream->open)
+                    stream_close (c->stream);
 
                 close (c->fd_mgmt);
                 client_free (c);

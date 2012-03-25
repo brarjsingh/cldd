@@ -45,7 +45,7 @@ struct _server {
     /* client management */
     GList *client_list;
     /* data for threading */
-    pthread_mutex_t data_lock;
+    GMutex *data_lock;
     /* performance logging */
     bool logging;
     FILE *statsfp;
@@ -88,6 +88,11 @@ void server_add_client (server *s, client *c);
  * @return 0 on success, 1 if there's no connection request, -1 on error
  */
 int server_connect_client (server *s, client *c);
+
+/**
+ * server_close_clients
+ */
+void server_close_clients (server *s);
 
 /**
  * server_next_stream_port

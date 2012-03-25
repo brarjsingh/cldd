@@ -74,7 +74,10 @@ client_process_cmd (client *c)
         CLDD_MESSAGE("Client SCH received");
     /* client disconnected */
     else if (g_str_has_prefix (recv, cldd_cmd_prefix (&cmds[CMD_DIS])))
+    {
+        CLDD_MESSAGE("Client DIS received");
         c->quit = true;
+    }
     else if (g_str_has_prefix (recv, cldd_cmd_prefix (&cmds[CMD_PNG])))
     {
         CLDD_MESSAGE("Client PNG received");
@@ -83,6 +86,7 @@ client_process_cmd (client *c)
         n = strlen (buf);
         if (writen (c->fd_mgmt, buf, n) != n)
             CLDD_MESSAGE("Client write error: PNG/ACK");
+        g_free (buf);
     }
     /* client requested stream setup information */
     else if (g_str_has_prefix (recv, cldd_cmd_prefix (&cmds[CMD_SSU])))
@@ -92,6 +96,7 @@ client_process_cmd (client *c)
         n = strlen (buf);
         if (writen (c->fd_mgmt, buf, n) != n)
             CLDD_MESSAGE("Client write error: SSU");
+        g_free (buf);
     }
     else if (g_str_has_prefix (recv, cldd_cmd_prefix (&cmds[CMD_AO])))
         CLDD_MESSAGE("Client AO received");
@@ -105,7 +110,6 @@ client_process_cmd (client *c)
     c->ntot += n;
     c->nreq++;
 
-    g_free (buf);
     g_free (recv);
 }
 

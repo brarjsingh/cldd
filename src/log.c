@@ -30,11 +30,10 @@
 #include "error.h"
 #include "server.h"
 
-pthread_t       logging_thread;
-pthread_cond_t  log_timer_cond  = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t log_timer_mutex = PTHREAD_MUTEX_INITIALIZER;
+GThread *log_task;
 
-void log_init (server *s, struct options *options)
+void
+log_init (server *s, struct options *options)
 {
     char stats_filename[80];
 
@@ -59,33 +58,38 @@ void log_init (server *s, struct options *options)
     fprintf (s->statsfp, "client stats:\n\nhost, fd, nreq, ntot\n");
 }
 
-void setup_log_output (server *s)
+void
+setup_log_output (server *s)
 {
     int ret;
+    GError *error;
 
     /* launch logging thread */
-    ret = pthread_create (&logging_thread, NULL, logging_func, s);
-    if (ret != 0)
-        CLDD_ERROR("Unable to create thread for logging");
+    log_task = g_thread_create ((GThreadFunc)log_task,
+                               (gpointer)s, true, &error);
 }
 
 void close_log_files (server *s)
 {
     s->logging = false;
-    pthread_join (logging_thread, NULL);
+    g_thread_join (log_task);
     /* add error checking later */
     fclose (s->statsfp);
     fclose (s->logfp);
 }
 
-void * logging_func (void *data)
+void * log_thread (gpointer data)
 {
-    int ret;
+    int ret, delay;
     struct timespec ts;
     time_t start, current;
     double dt;
     char buf[PATH_MAX];
     server *s = (server *)data;
+
+    static GStaticMutex lock = G_STATIC_MUTEX_INIT;
+    GCond *cond = g_cond_new ();
+    GTimeVal next_time;
 
     /* new stuff for glibtop */
     glibtop_cpu cpu;
@@ -99,30 +103,12 @@ void * logging_func (void *data)
                        "mem_used (MB), mem_free (MB), mem_buffered (MB), "
                        "mem_cached (MB), mem_user (MB), mem_locked (MB)\n");
 
+    /* 10Hz timer setup (in usec) */
+    delay = 1e6/10;
+    g_get_current_time (&next_time);
+
     for (;s->logging;)
     {
-        pthread_mutex_lock (&log_timer_mutex);
-
-        /* setup logging timer for 10Hz */
-        clock_gettime (CLOCK_REALTIME, &ts);
-        ts.tv_sec += 0;
-        ts.tv_nsec += 100000000;
-        if (ts.tv_nsec >= 1000000000)
-        {
-            ts.tv_sec++;
-            ts.tv_nsec -= 1000000000;
-        }
-
-        /* wait for the set time */
-        ret = pthread_cond_timedwait (&log_timer_cond, &log_timer_mutex, &ts);
-        if ((ret != 0) && (ret != ETIMEDOUT))
-        {
-            CLDD_MESSAGE("pthread_cond_timedwait() returned %d\n", ret);
-            pthread_mutex_unlock (&log_timer_mutex);
-            break;
-        }
-        pthread_mutex_unlock (&log_timer_mutex);
-
         /* refresh time for logging */
         time (&current);
         dt = difftime (current, start);
@@ -148,9 +134,17 @@ void * logging_func (void *data)
                  (unsigned long)memory.cached/(1024*1024),
                  (unsigned long)memory.user/(1024*1024),
                  (unsigned long)memory.locked/(1024*1024));
+
+        /* add another time delay */
+        g_time_val_add (&next_time, delay);
+        g_static_mutex_lock (&lock);
+        while (g_cond_timed_wait (cond,
+                                  g_static_mutex_get_mutex (&lock),
+                                  &next_time))
+            ;   /* do nothing */
+        g_static_mutex_unlock (&lock);
     }
 
-    pthread_mutex_unlock (&log_timer_mutex);
-
-    pthread_exit (NULL);
+    g_cond_free (cond);
+    g_thread_exit (NULL);
 }
