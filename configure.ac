@@ -203,28 +203,39 @@ if test x$enable_un = xyes; then
 	AC_CHECK_FUNCS(getpeereid)
 fi
 
-dnl --------------------------- Post Protocol Tests ---------------------------
 if
 	test x$enable_tcp = xno &&
 	test x$enable_un = xno; then
 	AC_MSG_ERROR([No client interfaces configured!])
 fi
 
-dnl ---------------------------------------------------------------------------
-dnl LIBC Features
-dnl ---------------------------------------------------------------------------
 if test x$enable_largefile != xno; then
 	AC_DEFINE([ENABLE_LARGEFILE], 1, [Define if large file support is enabled])
 fi
 
-dnl ---------------------------- warnings as errors ---------------------------
 if test "x$enable_werror" = xyes; then
 	AM_CFLAGS="$AM_CFLAGS -Werror -pedantic-errors"
 fi
 
 dnl ---------------------------------------------------------------------------
+dnl Doxygen Support
+dnl ---------------------------------------------------------------------------
+
+DX_HTML_FEATURE(ON)
+DX_CHM_FEATURE(OFF)
+DX_CHI_FEATURE(OFF)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_PS_FEATURE(OFF)
+
+DX_INIT_DOXYGEN([$PACKAGE_NAME],[doxygen.cfg])
+
+dnl ---------------------------------------------------------------------------
 dnl Pretty-Print Results
 dnl ---------------------------------------------------------------------------
+
 echo ''
 echo '########### CLDD CONFIGURATION ############'
 

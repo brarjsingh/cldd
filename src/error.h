@@ -28,8 +28,6 @@ BEGIN_C_DECLS
 /* These are a mix of some useful error facilities from mpd and Steven's unp. */
 
 /**
- * err_doit
- *
  * Print message and return to caller.
  *
  * @param errnoflag Caller specified flags for error number
@@ -40,8 +38,6 @@ BEGIN_C_DECLS
 static void err_doit (int errnoflag, int level, const char *fmt, va_list ap);
 
 /**
- * err_ret
- *
  * Nonfatal error related to system call
  * Print message and return
  *
@@ -51,8 +47,6 @@ static void err_doit (int errnoflag, int level, const char *fmt, va_list ap);
 void err_ret (const char *fmt, ...);
 
 /**
- * err_sys
- *
  * Fatal error related to system call
  * Print message and terminate
  *
@@ -62,8 +56,6 @@ void err_ret (const char *fmt, ...);
 void err_sys (const char *fmt, ...);
 
 /**
- * err_dump
- *
  * Fatal error related to system call
  * Print message, dump core, and terminate
  *
@@ -73,8 +65,6 @@ void err_sys (const char *fmt, ...);
 void err_dump (const char *fmt, ...);
 
 /**
- * err_msg
- *
  * Nonfatal error unrelated to system call
  * Print message and return
  *
@@ -84,8 +74,6 @@ void err_dump (const char *fmt, ...);
 void err_msg (const char *fmt, ...);
 
 /**
- * err_quit
- *
  * Fatal error unrelated to system call
  * Print message and terminate
  *

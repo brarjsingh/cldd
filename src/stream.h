@@ -25,53 +25,48 @@
 
 BEGIN_C_DECLS
 
+/**
+ * Output stream data used with client connection.
+ */
 struct stream_t {
-    int port;
-    int fd;
-    bool open;
-    gchar *guest;
-    GThread *task;
+    /*@{*/
+    int port;       /**< port number for the socket */
+    int fd;         /**< file descriptor used for communication */
+    bool open;      /**< flag to determine if stream is open or closed */
+    gchar *guest;   /**< string containing the ip or host name of the guest */
+    GThread *task;  /**< thread task that does the work */
+    /*@}*/
 };
 
 /**
- * stream_new
- *
- * Allocate memory for new stream data
+ * Allocate memory for new stream data.
  *
  * @return The new stream data
  */
 struct stream_t * stream_new (void);
 
 /**
- * stream_free
- *
- * Free up the allocate memory of the stream data
+ * Free up the allocate memory of the stream data.
  *
  * @param s Data to free up memory of
  */
 void stream_free (struct stream_t *s);
 
 /**
- * stream_open
- *
- * Open a port for data transmission
+ * Open a port for data transmission.
  *
  * @param s Stream to open a connection for
  */
 void stream_open (struct stream_t *s);
 
 /**
- * stream_close
- *
- * Close the open stream port
+ * Close the open stream port.
  *
  * @param s Stream to close the connection of
  */
 void stream_close (struct stream_t *s);
 
 /**
- * stream_thread
- *
  * Thread function to endlessly stream data to the client.
  *
  * @param data Thread data containing the client data that the stream is for

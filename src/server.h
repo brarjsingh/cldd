@@ -30,57 +30,79 @@ BEGIN_C_DECLS
 
 typedef struct _server server;
 
+/**
+ * Server data used for setup and client communications.
+ */
 struct _server {
-    int fd;
-    int port;
-    int n_clients;
-    int n_max_connected;
-    pid_t pid;
-    bool running;
-    /* for epoll on client connections */
-    int epoll_fd;
-    int num_fds;
-    struct epoll_event events[EPOLL_QUEUE_LEN];
-    struct epoll_event event;
-    /* client management */
-    GList *client_list;
-    /* data for threading */
-    GMutex *data_lock;
-    /* performance logging */
-    bool logging;
-    FILE *statsfp;
-    FILE *logfp;
-    char *log_filename;
+    /*@{*/
+    int fd;                 /**< file descriptor to listen on */
+    int port;               /**< port number to open for server */
+    pid_t pid;              /**< pid of daemon process */
+    bool running;           /**< flag used to stop process */
+    GList *client_list;     /**< client management */
+    GMutex *data_lock;      /**< data for threading */
+    /*@}*/
+    /**
+     * edge triggering client connections
+     */
+    /*@{*/
+    int epoll_fd;           /**< file descriptor that an event was seen on */
+    int num_fds;            /**< number of file descriptors that saw an event */
+    struct epoll_event events[EPOLL_QUEUE_LEN]; /**< list of events */
+    struct epoll_event event;                   /**< epoll data for setup */
+    /*@}*/
+    /**
+     * performance logging
+     */
+    /*@{*/
+    int n_clients;          /**< number of clients currently connected */
+    int n_max_connected;    /**< peak connection count seen by server */
+    bool logging;           /**< flag to control logging */
+    FILE *statsfp;          /**< file to output stats to */
+    FILE *logfp;            /**< file to output general server info to */
+    char *log_filename;     /**< filename to use for general server info file */
+    /*@}*/
 };
 
 /**
- * server_new
+ * Allocates memory for a new server struct.
+ *
+ * @return Allocated data for a new server struct
  */
 server * server_new (void);
 
 /**
- * server_free
+ * Frees any memory that was allocated for a server struct.
+ *
+ * @param s The server data to free up
  */
 void server_free (server *s);
 
 /**
- * server_init_tcp
+ * Initializes the TCP socket used for client command communications.
+ *
+ * @param s Server data containing the file descriptor and related variables
+ *          needed to setup TCP communications
  */
 void server_init_tcp (server *s);
 
 /**
- * server_init_epoll
+ * Initializes epoll edge triggering to handle input events received
+ * from clients.
+ *
+ * @param s Server data containing epoll data needed to enable edge triggering
  */
 void server_init_epoll (server *s);
 
 /**
- * server_add_client
+ * Adds a newly allocated client to the list in the server data.
+ *
+ * @param s Server data containing the list of clients to add to
+ * @param c Client data to add to the server list
  */
 void server_add_client (server *s, client *c);
 
 /**
- * server_connect_client
- *
  * Perform the client connection setup.
  *
  * @param s Server data to connect client to
@@ -90,18 +112,20 @@ void server_add_client (server *s, client *c);
 int server_connect_client (server *s, client *c);
 
 /**
- * server_close_clients
+ * Iterates through the list of clients and closes them and any streams they
+ * have.
+ *
+ * @param s Server data containing the list of clients to close
  */
 void server_close_clients (server *s);
 
 /**
- * server_next_stream_port
- *
  * Iterate through the list of clients and get the next available port number
  * to use to setup a streaming socket.
  *
- * @param s
- * @return
+ * @param s Server data containing the list of clients to iterate through and
+ *          find the next available port number
+ * @return The next available port number that the server can use for a stream
  */
 int server_next_stream_port (server *s);
 

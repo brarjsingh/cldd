@@ -18,21 +18,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef _CLDD_UTILS_H
-#define _CLDD_UTILS_H
+#include <common.h>
 
-#include "common.h"
-
-BEGIN_C_DECLS
-
-/**
- * Applies the O_NONBLOCK flag to the descriptor using fcntl.
- *
- * @param fd The file descriptor to set non blocking
- * @return   Passes the return value given by fcntl
- */
-int set_nonblocking (int fd);
-
-END_C_DECLS
-
-#endif
+#include "daq.h"

@@ -25,33 +25,34 @@
 
 BEGIN_C_DECLS
 
+/**
+ * Command line options read from the user.
+ */
 struct options {
-    int  port;
-    char *log_filename;
-    bool kill;
-    bool daemon;
-    bool verbose;
+    /*@{*/
+    int  port;          /**< port number to use with the server */
+    char *log_filename; /**< filename to write server statistics to */
+    bool kill;          /**< kill flag used to send shutdown signal to daemon */
+    bool daemon;        /**< flag to tell process whether or not to daemonize */
+    bool verbose;       /**< verbose command line output for debugging */
+    /*@}*/
 };
 
 /**
- * parse_cmdline
- *
  * Parses the command line arguments that were passed in at launch.
  *
  * @param argc    Number of command line arguments
- * @param argv    String list of arguments
+ * @param argv    String list of arguments given by user
  * @param options Structure to hold the results of getopt
  */
-bool
-parse_cmdline (int argc, char **argv, struct options *options);
+bool parse_cmdline (int argc, char **argv, struct options *options);
 
 /**
- * usage
- *
  * Print the help/usage string for the daemon
+ *
+ * @param argv String list of arguments given by user
  */
-void
-usage (char **argv);
+void usage (char **argv);
 
 END_C_DECLS
 

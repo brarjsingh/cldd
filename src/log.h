@@ -28,22 +28,54 @@ BEGIN_C_DECLS
 #include "cmdline.h"
 #include "server.h"
 
+/**
+ * Process statistics to log.
+ */
 struct proc_stat_t {
-    long long int user;
-    long long int nice;
-    long long int system;
-    long long int idle;
-    long long int iowait;
+    /*@{*/
+    long long int user;     /**< cpu user */
+    long long int nice;     /**< cpu nice */
+    long long int system;   /**< cpu system */
+    long long int idle;     /**< cpu idle */
+    long long int iowait;   /**< cpu iowait */
+    /*@}*/
 };
 
 extern GThread *log_task;
 
 /* TODO: create struct log and replace server in function parameters */
 
+/**
+ * Initialize the server performance logging. This was used for an early test
+ * and isn't needed anymore.
+ *
+ * @param s       Server data with info of server and file pointers to write to
+ * @param options Command line options given at launch
+ */
 void log_init (server *s, struct options *options);
+
+/**
+ * Wrapper function to start the log thread.
+ *
+ * @param s Server data with pid of server and file pointers to write to
+ */
 void setup_log_output (server *s);
+
+/**
+ * Stops the logging thread and closes any files that were opened for the log
+ * process.
+ *
+ * @param s Server data with info of server and file pointers to write to
+ */
 void close_log_files (server *s);
-void * log_func (void *data);
+
+/**
+ * Thread function that reads current performance stats and logs them to a file
+ * using a 10Hz timer loop.
+ *
+ * @param data Server data with info of server and file pointers to write to
+ */
+void * log_thread (void *data);
 
 END_C_DECLS
 
