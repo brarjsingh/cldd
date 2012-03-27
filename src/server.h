@@ -57,6 +57,8 @@ struct _server {
     /*@{*/
     int n_clients;          /**< number of clients currently connected */
     int n_max_connected;    /**< peak connection count seen by server */
+    unsigned long b_sent;   /**< total number of bytes on all streams */
+    double tx_rate;         /**< average data rate in kbps for server streams */
     bool logging;           /**< flag to control logging */
     FILE *statsfp;          /**< file to output stats to */
     FILE *logfp;            /**< file to output general server info to */

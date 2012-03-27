@@ -37,6 +37,8 @@ server_new (void)
     s->pid = getpid ();
     s->n_clients = 0;
     s->n_max_connected = 0;
+    s->b_sent = 0;
+    s->tx_rate = 0.0;
 
     /* create the mutexes for controlling access to thread data */
     s->data_lock = g_mutex_new ();

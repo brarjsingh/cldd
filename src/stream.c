@@ -29,6 +29,7 @@ stream_new (void)
 {
     struct stream_t *s = g_malloc (sizeof (struct stream_t));
     s->guest = g_malloc (MAXLINE * sizeof (gchar));
+    s->b_sent = 0;
     return s;
 }
 
@@ -136,18 +137,25 @@ stream_thread (gpointer data)
 //    set_nonblocking (fd);
 
     /* 10Hz timer setup (in usec) */
-    delay = 1e6/10;
+    delay = 1e6/1000;
     g_get_current_time (&next_time);
 
     while (s->open)
     {
-        /* transmit current data */
-        g_snprintf (buf, MAXLINE, "$12:00:00.000&0|0.000,1|0.000,2|0.000\n");
+        /* transmit current data - typical stream sample of 32 channels used */
+        g_snprintf (buf, MAXLINE, "$12:00:00.000&"
+                "0|0.000,1|0.000,2|0.000,3|0.000,4|0.000,5|0.000,6|0.000,7|0.000,"
+                "8|0.000,9|0.000,10|0.000,11|0.000,12|0.000,13|0.000,14|0.000,15|0.000,"
+                "16|0.000,17|0.000,18|0.000,19|0.000,20|0.000,21|0.000,21|0.000,23|0.000,"
+                "24|0.000,25|0.000,26|0.000,27|0.000,28|0.000,29|0.000,30|0.000,31|0.000\n");
         if ((n = writen (fd, buf, strlen (buf))) != strlen (buf))
             CLDD_MESSAGE("Client write error: %s", strerror (errno));
 
         if (errno == ECONNRESET)
             s->open = false;
+
+        /* add to the stream total byte count */
+        s->b_sent += n;
 
         /* add another time delay */
         g_time_val_add (&next_time, delay);

@@ -33,6 +33,7 @@ struct stream_t {
     int port;       /**< port number for the socket */
     int fd;         /**< file descriptor used for communication */
     bool open;      /**< flag to determine if stream is open or closed */
+    unsigned long b_sent;   /**< total bytes sent for the stream */
     gchar *guest;   /**< string containing the ip or host name of the guest */
     GThread *task;  /**< thread task that does the work */
     /*@}*/

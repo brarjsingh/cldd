@@ -78,13 +78,13 @@ main (int argc, char **argv)
     daemonize_close_stdin ();
 
     glue_daemonize_init (&options);
-//    log_init (s, &options);
+    log_init (s, &options);
 
     daemonize_set_user ();
 
     /* passing true starts daemon in detached mode */
     daemonize (options.daemon);
-//    setup_log_output (s);
+    setup_log_output (s);
 
     /* start the master thread for client management */
     main_task = g_thread_create ((GThreadFunc)client_manager,
@@ -97,7 +97,7 @@ main (int argc, char **argv)
     g_main_loop_unref (main_loop);
 
     daemonize_finish ();
-//    close_log_files (s);
+    close_log_files (s);
 
     /* clean up */
     server_free (s);
@@ -106,8 +106,6 @@ main (int argc, char **argv)
 }
 
 /**
- * signal_handler
- *
  * Use syslog for now, when logging facilities are available should use those
  * instead.
  *
@@ -121,7 +119,8 @@ signal_handler (int sig)
     {
         case SIGHUP:
             syslog (LOG_WARNING, "Received SIGHUP signal.");
-            /* use this to restart - later */
+            /* this signal causes an errno of EINTR on epoll_pwait to exit
+             * the socket wait loop */
             break;
         case SIGTERM:
             syslog (LOG_WARNING, "Received SIGTERM signal.");
@@ -138,8 +137,6 @@ signal_handler (int sig)
 }
 
 /**
- * client_manager
- *
  * Thread function to manage client connections.
  *
  * @param data Thread data for the function
@@ -193,8 +190,6 @@ client_manager (gpointer data)
 }
 
 /**
- * process_events
- *
  * Process edge triggered events seen by epoll.
  *
  * @param s The server data containing the epoll events to handle

@@ -27,13 +27,34 @@ BEGIN_C_DECLS
 
 #include "cmdline.h"
 
-#define MAXLINE             4096        /* max text line length */
+/**
+ * Max line length for socket reads and writes
+ */
+#define MAXLINE             4096
+
+/**
+ * Client backlog for socket listen
+ */
 #define BACKLOG             1024
+
+/**
+ * Size of epoll event queue
+ */
 #define EPOLL_QUEUE_LEN     256
+
+/**
+ * Default port for client management
+ */
 #define DEFAULT_PORT        10000
+
+/**
+ * Port number base for client transmission streams
+ */
 #define STREAM_PORT_BASE    10500
 
-/* replace later with value taken from configuration file */
+/**
+ * File that contains the process pid, used with daemon kill
+ */
 #define PID_FILE    "/var/run/cldd.pid"
 
 /* the main execution loop */

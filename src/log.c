@@ -50,12 +50,12 @@ log_init (server *s, struct options *options)
     s->logging = true;
 
     /* hard coded - ugh, fix later */
-    sprintf (stats_filename, "stats.%d.log", getpid ());
-    s->statsfp = fopen (stats_filename, "w");
+//    sprintf (stats_filename, "stats.%d.log", getpid ());
+//    s->statsfp = fopen (stats_filename, "w");
     s->logfp = fopen (s->log_filename, "w");
 
     /* write header to client stats log */
-    fprintf (s->statsfp, "client stats:\n\nhost, fd, nreq, ntot\n");
+//    fprintf (s->statsfp, "client stats:\n\nhost, fd, nreq, ntot\n");
 }
 
 void
@@ -74,17 +74,20 @@ void close_log_files (server *s)
     s->logging = false;
     g_thread_join (log_task);
     /* add error checking later */
-    fclose (s->statsfp);
+//    fclose (s->statsfp);
     fclose (s->logfp);
 }
 
 void * log_thread (gpointer data)
 {
-    int ret, delay;
+    int i, ret, delay;
+    unsigned long n_bytes, n_bytes_old;
     struct timespec ts;
     time_t start, current;
     double dt;
     char buf[PATH_MAX];
+    client *c = NULL;
+    GList *it, *next;
     server *s = (server *)data;
 
     static GStaticMutex lock = G_STATIC_MUTEX_INIT;
@@ -101,7 +104,12 @@ void * log_thread (gpointer data)
     fprintf (s->logfp, "time, n_clients, max_clients, cpu_tot, cpu_user, "
                        "cpu_nice, cpu_sys, cpu_idle, cpu_freq, mem_tot (MB), "
                        "mem_used (MB), mem_free (MB), mem_buffered (MB), "
-                       "mem_cached (MB), mem_user (MB), mem_locked (MB)\n");
+                       "mem_cached (MB), mem_user (MB), mem_locked (MB), "
+                       "tot_sent (Bytes), tx_rate_avg (kBps)\n");
+
+    /* for baudrate calc */
+    i = 1;
+    n_bytes = n_bytes_old = 0;
 
     /* 10Hz timer setup (in usec) */
     delay = 1e6/10;
@@ -116,9 +124,31 @@ void * log_thread (gpointer data)
         glibtop_get_cpu (&cpu);
         glibtop_get_mem (&memory);
 
+        /* calculate the new transmission rate - 10 times through the loop
+         * is a fairly accurate calculation for 1 second, not perfect though */
+        if (i == 10)
+        {
+            i = 1;
+            n_bytes_old = n_bytes;
+            g_mutex_trylock (s->data_lock);
+            it = s->client_list;
+            /* go through the list of clients and add up stream byte count */
+            while (it != NULL)
+            {
+                c = (client *)it->data;
+                next = g_list_next (it);
+                s->b_sent += c->stream->b_sent;
+                it = next;
+            }
+            n_bytes = s->b_sent;
+            /* no time component in the calc since this is done over 1 sec */
+            s->tx_rate = (double)(n_bytes - n_bytes_old) / 1024;
+            g_mutex_unlock (s->data_lock);
+        }
+
         /* write the next line */
         fprintf (s->logfp, "%.3f, %d, %d, %ld, %ld, %ld, %ld, %ld, %ld, %ld, "
-                           "%ld, %ld, %ld, %ld, %ld, %ld, %ld\n",
+                           "%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %.3f\n",
                  dt, s->n_clients, s->n_max_connected,
                  (unsigned long)cpu.total,
                  (unsigned long)cpu.user,
@@ -133,7 +163,8 @@ void * log_thread (gpointer data)
                  (unsigned long)memory.buffer/(1024*1024),
                  (unsigned long)memory.cached/(1024*1024),
                  (unsigned long)memory.user/(1024*1024),
-                 (unsigned long)memory.locked/(1024*1024));
+                 (unsigned long)memory.locked/(1024*1024),
+                 s->b_sent, s->tx_rate);
 
         /* add another time delay */
         g_time_val_add (&next_time, delay);
@@ -143,6 +174,8 @@ void * log_thread (gpointer data)
                                   &next_time))
             ;   /* do nothing */
         g_static_mutex_unlock (&lock);
+
+        i++;
     }
 
     g_cond_free (cond);
