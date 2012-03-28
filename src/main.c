@@ -71,6 +71,8 @@ main (int argc, char **argv)
     signal (SIGTERM, signal_handler);
     signal (SIGQUIT, signal_handler);
 
+    g_thread_init (NULL);
+
     /* allocate memory for server data */
     s = server_new ();
     s->port = options.port;
