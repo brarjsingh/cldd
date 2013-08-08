@@ -31,7 +31,10 @@ BEGIN_C_DECLS
  * @param fd The file descriptor to set non blocking
  * @return   Passes the return value given by fcntl
  */
-int set_nonblocking (int fd);
+/*int set_nonblocking (int fd);*/
+
+bool rt_memlock (void);
+bool rt_hrtimers (void);
 
 END_C_DECLS
 

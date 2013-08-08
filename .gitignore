@@ -1,1 +1,24 @@
+# file excludes
+*.o
+*.~
 *.swp
+
+# auto generated file excludes
+Makefile
+Makefile.in
+aclocal.m4
+compile
+config.h
+config.h.in
+config.log
+config.status
+configure
+depcomp
+install-sh
+missing
+stamp-h1
+
+# auto generated directory excludes
+autom4te.cache/
+src/.deps
+tests/.deps

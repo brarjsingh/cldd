@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "cldd.h"
 #include "cmdline.h"
@@ -55,6 +55,8 @@ usage (char **argv)
             "Application Options:\n"
             "\t-p, --port       the port to use for the daemon\n"
             "\t-l, --logfile    a file to use for logging\n"
+            "\t-c, --clddcfg    alternate CLDD configuration to use\n"
+            "\t-C, --cldcfg     alternate CLD configuration to use\n"
             "\t-k, --kill       kill the currently running cldd session\n"
             "\t-d, --daemon     detach from the console\n"
             "\t-v, --verbose    verbose logging\n"
@@ -69,13 +71,15 @@ parse_cmdline (int argc, char **argv, struct options *options)
     int opt = 0;
     int opt_index = 0;
 
-    static const char * opt_string = ":vdp:l:Vkh?";
+    static const char * opt_string = ":vdp:l:c:C:Vkh?";
     static const struct option cmd_options[] = {
         /* options that set a flag */
         { "verbose", no_argument,       NULL, 'v' },
         { "daemon",  no_argument,       NULL, 'd' },
         { "port",    required_argument, NULL, 'p' },
         { "logfile", required_argument, NULL, 'l' },
+        { "clddcfg", required_argument, NULL, 'c' },
+        { "cldcfg",  required_argument, NULL, 'C' },
         { "version", no_argument,       NULL, 'V' },
         { "kill",    no_argument,       NULL, 'k' },
         { "help",    no_argument,       NULL, 'h' },
@@ -84,8 +88,13 @@ parse_cmdline (int argc, char **argv, struct options *options)
 
     /* set defaults */
     options->port = DEFAULT_PORT;
-    options->log_filename = malloc (sizeof (32));
+    options->log_filename = malloc (sizeof (512));
+    options->cldd_config = malloc (sizeof (512));
+    options->cld_config = malloc (sizeof (512));
+
     strcpy (options->log_filename, "log.dat");
+    strcpy (options->cldd_config, DATADIR"/cldd.conf");
+    strcpy (options->cld_config, DATADIR"/cld.xml");
 
     /* should include error checking later */
 
@@ -106,9 +115,20 @@ parse_cmdline (int argc, char **argv, struct options *options)
             case 'l':
                 free (options->log_filename);
                 options->log_filename = malloc (sizeof (optarg));
-                strcpy (options->log_filename, optarg);
+                strncpy (options->log_filename, optarg, strlen (optarg));
                 options->log_filename[strlen (optarg)] = '\0';
-                //fprintf (stderr, "received: %s\n", options->log_filename);
+                break;
+            case 'c':
+                free (options->cld_config);
+                options->cld_config = malloc (sizeof (optarg));
+                strncpy (options->cld_config, optarg, strlen (optarg));
+                options->cld_config[strlen (optarg)] = '\0';
+                break;
+            case 'C':
+                free (options->cldd_config);
+                options->cldd_config = malloc (sizeof (optarg));
+                strncpy (options->cldd_config, optarg, strlen (optarg));
+                options->cldd_config[strlen (optarg)] = '\0';
                 break;
             case 'V':
                 version ();

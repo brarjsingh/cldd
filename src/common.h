@@ -14,13 +14,28 @@
 #  include <config.h>
 #endif
 
+#include <signal.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <pwd.h>
+#include <getopt.h>
+#include <time.h>
+#include <assert.h>
+#include <pthread.h>
+#include <sched.h>
+
 #include <asm/types.h>
+#include <arpa/inet.h>
+#include <linux/limits.h>
+#include <netinet/in.h>
+
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/epoll.h>
 
@@ -30,6 +45,7 @@
 #  include <stdarg.h>
 #  include <string.h>
 #  include <stdbool.h>
+#  include <stdint.h>
 #endif
 
 #if HAVE_UNISTD_H
@@ -52,23 +68,10 @@
 #  include <tcpd.h>
 #endif
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <signal.h>
-#include <netdb.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <pwd.h>
-#include <getopt.h>
-#include <time.h>
-#include <assert.h>
-#include <pthread.h>
-#include <linux/limits.h>
-
 #include <glib.h>
 #include <libxml/tree.h>
-#include <cldd-0.1/cldd.h>
-#include <cldd-0.1/cmd.h>
+#include <cld-0.2/cld.h>
+#include <cldd-0.2/cldd.h>
 
 #ifndef EXIT_SUCCESS
 #  define EXIT_SUCCESS  0

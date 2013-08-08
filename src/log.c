@@ -18,12 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
-#include <glibtop.h>
-#include <glibtop/cpu.h>
-#include <glibtop/mem.h>
-#include <glibtop/proclist.h>
+//#include <glibtop.h>
+//#include <glibtop/cpu.h>
+//#include <glibtop/mem.h>
+//#include <glibtop/proclist.h>
 
 #include "log.h"
 #include "cmdline.h"
@@ -32,13 +32,58 @@
 
 GThread *log_task;
 
+struct log_t *
+log_new (void)
+{
+    struct log_t *log = malloc (sizeof (struct log_t));
+
+    log->active = false;
+    log->reload = false;
+
+    return log;
+}
+
 void
-log_init (server *s, struct options *options)
+log_free (struct log_t *log)
+{
+    log->active = false;
+    /* TODO: join the log thread here */
+
+    free (log);
+    log = NULL;
+}
+
+void *
+log_thread (gpointer data)
+{
+    g_thread_exit (NULL);
+}
+
+int
+log_start (struct log_t *log)
+{
+    return 0;
+}
+
+int
+log_pause (struct log_t *log)
+{
+    return 0;
+}
+
+int
+log_stop (struct log_t *log)
+{
+    return 0;
+}
+
+void
+stat_log_new (server *s, struct options *options)
 {
     char stats_filename[80];
 
     /* should create a log struct and do this in a new func */
-    glibtop_init ();
+//    glibtop_init ();
 
     s->log_filename = malloc (sizeof (options->log_filename));
     strcpy (s->log_filename, options->log_filename);
@@ -49,17 +94,19 @@ log_init (server *s, struct options *options)
     /* these don't account for file overwrites, fix later */
     s->logging = true;
 
-    /* hard coded - ugh, fix later */
-//    sprintf (stats_filename, "stats.%d.log", getpid ());
-//    s->statsfp = fopen (stats_filename, "w");
+    /* this should pull from the cldd configuration file which doesn't exist */
     s->logfp = fopen (s->log_filename, "w");
-
-    /* write header to client stats log */
-//    fprintf (s->statsfp, "client stats:\n\nhost, fd, nreq, ntot\n");
 }
 
 void
-setup_log_output (server *s)
+stat_log_free (struct stat_log_t *log)
+{
+    free (log);
+    log = NULL;
+}
+
+void
+stat_log_setup_output (server *s)
 {
     int ret;
     GError *error;
@@ -69,16 +116,16 @@ setup_log_output (server *s)
                                (gpointer)s, true, &error);
 }
 
-void close_log_files (server *s)
+void
+stat_log_file_close (server *s)
 {
     s->logging = false;
     g_thread_join (log_task);
-    /* add error checking later */
-//    fclose (s->statsfp);
     fclose (s->logfp);
 }
 
-void * log_thread (gpointer data)
+void *
+stat_log_thread (gpointer data)
 {
     int i, ret, delay;
     unsigned long n_bytes, n_bytes_old;
@@ -95,8 +142,8 @@ void * log_thread (gpointer data)
     GTimeVal next_time;
 
     /* new stuff for glibtop */
-    glibtop_cpu cpu;
-    glibtop_mem memory;
+//    glibtop_cpu cpu;
+//    glibtop_mem memory;
 //    glibtop_proclist proclist;
 
     /* setup header */
@@ -121,8 +168,8 @@ void * log_thread (gpointer data)
         time (&current);
         dt = difftime (current, start);
 
-        glibtop_get_cpu (&cpu);
-        glibtop_get_mem (&memory);
+//        glibtop_get_cpu (&cpu);
+//        glibtop_get_mem (&memory);
 
         /* calculate the new transmission rate - 10 times through the loop
          * is a fairly accurate calculation for 1 second, not perfect though */
@@ -130,7 +177,7 @@ void * log_thread (gpointer data)
         {
             i = 1;
             n_bytes_old = n_bytes;
-            g_mutex_trylock (s->data_lock);
+            g_mutex_trylock (&s->data_lock);
             it = s->client_list;
             /* go through the list of clients and add up stream byte count */
             while (it != NULL)
@@ -143,10 +190,11 @@ void * log_thread (gpointer data)
             n_bytes = s->b_sent;
             /* no time component in the calc since this is done over 1 sec */
             s->tx_rate = (double)(n_bytes - n_bytes_old) / 1024;
-            g_mutex_unlock (s->data_lock);
+            g_mutex_unlock (&s->data_lock);
         }
 
         /* write the next line */
+        /*
         fprintf (s->logfp, "%.3f, %d, %d, %ld, %ld, %ld, %ld, %ld, %ld, %ld, "
                            "%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %.3f\n",
                  dt, s->n_clients, s->n_max_connected,
@@ -165,6 +213,7 @@ void * log_thread (gpointer data)
                  (unsigned long)memory.user/(1024*1024),
                  (unsigned long)memory.locked/(1024*1024),
                  s->b_sent, s->tx_rate);
+        */
 
         /* add another time delay */
         g_time_val_add (&next_time, delay);

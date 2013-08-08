@@ -29,7 +29,19 @@ BEGIN_C_DECLS
 #include "server.h"
 
 /**
- * Process statistics to log.
+ * A structure that contains data needed for logging
+ */
+struct log_t {
+    /*@{*/
+    bool active;            /**< whether or the log task is running */
+    bool reload;
+    CldLog *c_log;          /**< data for logging */
+    GThread *task;
+    /*@}*/
+};
+
+/**
+ * Process statistics to log
  */
 struct proc_stat_t {
     /*@{*/
@@ -41,7 +53,33 @@ struct proc_stat_t {
     /*@}*/
 };
 
+/**
+ * Statistics log
+ */
+struct stat_log_t {
+    bool active;
+    bool reload;
+    struct proc_stat_t *stat;
+    GThread *task;
+};
+
 extern GThread *log_task;
+
+/* -- start of new log section -- */
+
+struct log_t * log_new (void);
+void log_free (struct log_t *log);
+int log_start (struct log_t *log);
+int log_pause (struct log_t *log);
+int log_stop (struct log_t *log);
+
+/**
+ * Thread function that reads current performance stats and logs them to a file
+ * using a timer loop with frequency set by configuration file.
+ *
+ * @param data Server data with info of server and file pointers to write to
+ */
+void * log_thread (gpointer data);
 
 /* TODO: create struct log and replace server in function parameters */
 
@@ -52,14 +90,21 @@ extern GThread *log_task;
  * @param s       Server data with info of server and file pointers to write to
  * @param options Command line options given at launch
  */
-void log_init (server *s, struct options *options);
+void stat_log_new (server *s, struct options *options);
+
+/**
+ * Free up the memory that was used for the server stats log.
+ *
+ * @param log The memory to free
+ */
+void stat_log_free (struct stat_log_t *log);
 
 /**
  * Wrapper function to start the log thread.
  *
  * @param s Server data with pid of server and file pointers to write to
  */
-void setup_log_output (server *s);
+void stat_log_setup_output (server *s);
 
 /**
  * Stops the logging thread and closes any files that were opened for the log
@@ -67,15 +112,15 @@ void setup_log_output (server *s);
  *
  * @param s Server data with info of server and file pointers to write to
  */
-void close_log_files (server *s);
+void stat_log_file_close (server *s);
 
 /**
  * Thread function that reads current performance stats and logs them to a file
- * using a 10Hz timer loop.
+ * using a timer loop with frequency set by configuration file.
  *
  * @param data Server data with info of server and file pointers to write to
  */
-void * log_thread (void *data);
+void * stat_log_thread (gpointer data);
 
 END_C_DECLS
 

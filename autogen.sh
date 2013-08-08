@@ -4,6 +4,9 @@
 
 package="cldd"
 
+# for distributions that don't include it
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/
+
 olddir="`pwd`"
 srcdir=`dirname $0`
 test -z "$srcdir" && srcdir=.

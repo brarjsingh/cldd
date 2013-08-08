@@ -18,6 +18,46 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "daq.h"
+
+struct daq_t *
+daq_new (void)
+{
+    struct daq_t *daq = malloc (sizeof (struct daq_t));
+
+    daq->is_initialized = false;
+
+    return daq;
+}
+
+struct daq_t *
+daq_new_from_builder (CldBuilder *builder)
+{
+    struct daq_t *daq = malloc (sizeof (struct daq_t));
+
+    /* default call will return the first available */
+    daq->c_daq = cld_builder_get_default_daq (builder);
+    daq->c_control = cld_builder_get_default_control (builder);
+    /* read all of the object lists as TreeMaps */
+    daq->c_calibrations = cld_builder_get_calibrations (builder);
+    daq->c_channels = cld_builder_get_channels (builder);
+
+    daq->is_initialized = true;
+
+    return daq;
+}
+
+void
+daq_free (struct daq_t *daq)
+{
+    /* don't know if this frees the memory in maps or not but gee doesn't
+     * include free functions for its collections */
+    gee_map_clear (daq->c_calibrations);
+    gee_map_clear (daq->c_channels);
+
+    daq->is_initialized = false;
+
+    free (daq);
+}
