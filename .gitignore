@@ -1,6 +1,6 @@
 # file excludes
+*~
 *.o
-*.~
 *.swp
 
 # auto generated file excludes
@@ -17,6 +17,10 @@ depcomp
 install-sh
 missing
 stamp-h1
+
+# executables
+src/cldd
+tests/test-rt
 
 # auto generated directory excludes
 autom4te.cache/
