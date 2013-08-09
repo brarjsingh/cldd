@@ -1,7 +1,5 @@
 noinst_DATA = \
-	config.vapi \
-	callbacks.vapi \
-	threads.vapi
+	config.vapi
 
 EXTRA_DIST = \
 	$(noinst_DATA)

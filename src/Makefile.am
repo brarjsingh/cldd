@@ -1,7 +1,5 @@
 bin_PROGRAMS = cldd
 
-noinst_LIBRARIES =
-
 VALAFLAGS = \
 	-H $(srcdir)/libcldd.h -C -c --thread \
 	--vapidir=$(srcdir)/../vapi -X -g \
@@ -10,7 +8,7 @@ VALAFLAGS = \
 cldd_CFLAGS = \
 	-DPACKAGE_DATA_DIR=\""$(datadir)"\" \
 	-DPACKAGE_LOCALE_DIR=\""$(prefix)/$(DATADIRNAME)/locale"\" \
-	@PACKAGE_CFLAGS@
+	@PACKAGE_CFLAGS@ \
 	$(AM_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GEE_CFLAGS) \
