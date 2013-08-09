@@ -6,7 +6,6 @@
 # auto generated file excludes
 Makefile
 Makefile.in
-aclocal.m4
 compile
 config.h
 config.h.in
