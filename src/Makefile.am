@@ -3,7 +3,7 @@ bin_PROGRAMS = cldd
 VALAFLAGS = \
 	-H $(srcdir)/libcldd.h -C -c --thread \
 	--vapidir=$(srcdir)/../vapi -X -g \
-	@VALA_PACKAGES@ --pkg config
+	@VALA_PACKAGES@ --pkg posix --pkg config
 
 cldd_CFLAGS = \
 	-DPACKAGE_DATA_DIR=\""$(datadir)"\" \
