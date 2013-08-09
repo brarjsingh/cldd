@@ -28,8 +28,6 @@ BEGIN_C_DECLS
 #include "cldd.h"
 #include "stream.h"
 
-extern const gchar sendbuf[MAXLINE];
-
 typedef struct _client client;
 
 /**

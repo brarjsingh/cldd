@@ -18,16 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "cldd.h"
 #include "client.h"
 #include "error.h"
 #include "stream.h"
-
-/* this was just for testing */
-const gchar sendbuf[MAXLINE] =
-        "012345678901234567890123456789012345678901234567890123456789012\n";
 
 client *
 client_new (void)

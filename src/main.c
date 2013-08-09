@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "cldd.h"
 #include "client.h"
@@ -71,22 +71,40 @@ main (int argc, char **argv)
     signal (SIGTERM, signal_handler);
     signal (SIGQUIT, signal_handler);
 
+    /* glib-2.32 complains if you don't initialize the right way */
+#ifdef HAVE_GLIB232
+    g_type_init ();
+#else
     g_thread_init (NULL);
+#endif
 
     /* allocate memory for server data */
     s = server_new ();
     s->port = options.port;
 
+    /* lock process into memory to prevent swapping */
+    if ((s->rt = rt_memlock ()) == false)
+        CLDD_MESSAGE("rt_memlock failed, real time not enabled");
+
+    /* check whether or not high resolution timers are enabled */
+    if ((s->rt = rt_hrtimers ()) == false)
+        CLDD_MESSAGE("rt_hrtimers failed, real time not enabled");
+
     daemonize_close_stdin ();
 
     glue_daemonize_init (&options);
-    log_init (s, &options);
+    stat_log_new (s, &options);
 
     daemonize_set_user ();
 
     /* passing true starts daemon in detached mode */
     daemonize (options.daemon);
-    setup_log_output (s);
+
+    /* TODO: setup hardware data and threads */
+    /* TODO: setup logging data and threads */
+    /* TODO: setup control data and threads */
+
+    stat_log_setup_output (s);
 
     /* start the master thread for client management */
     main_task = g_thread_create ((GThreadFunc)client_manager,
@@ -99,7 +117,7 @@ main (int argc, char **argv)
     g_main_loop_unref (main_loop);
 
     daemonize_finish ();
-    close_log_files (s);
+    stat_log_file_close (s);
 
     /* clean up */
     server_free (s);
@@ -164,11 +182,11 @@ client_manager (gpointer data)
 
     while (running)
     {
-        g_mutex_lock (s->data_lock);
+        g_mutex_lock (&s->data_lock);
         /* timeout was added to prevent an undesirable thread condition */
         s->num_fds = epoll_pwait (s->epoll_fd, s->events,
                                   EPOLL_QUEUE_LEN, timeout, &mask);
-        g_mutex_unlock (s->data_lock);
+        g_mutex_unlock (&s->data_lock);
 
         if (errno == EINTR)
             break;
@@ -246,7 +264,7 @@ process_events (server *s)
                                  c->fd_mgmt, c->hbuf, c->sbuf);
 
                 /* add the new client to the server */
-                g_mutex_lock (s->data_lock);
+                g_mutex_lock (&s->data_lock);
                 server_add_client (s, c);
 
                 /* add a streaming output socket to the client */
@@ -259,7 +277,7 @@ process_events (server *s)
                 if (writen (c->fd_mgmt, buf, n) != n)
                     CLDD_MESSAGE("Client write error: SRY");
 
-                g_mutex_unlock (s->data_lock);
+                g_mutex_unlock (&s->data_lock);
             }
 
             continue;
@@ -283,7 +301,7 @@ process_events (server *s)
             /* check if the client is pending quit */
             if (c->quit)
             {
-                g_mutex_trylock (s->data_lock);
+                g_mutex_trylock (&s->data_lock);
                 s->n_clients--;
                 s->client_list = g_list_delete_link (s->client_list, it);
                 CLDD_MESSAGE("Removed client from list, new size: %d",
@@ -291,7 +309,7 @@ process_events (server *s)
                 /* log the client stats before closing it */
                 //fprintf (s->statsfp, "%s, %d, %d, %d\n",
                 //         c->hbuf, c->fd_mgmt, c->nreq, c->ntot);
-                g_mutex_unlock (s->data_lock);
+                g_mutex_unlock (&s->data_lock);
 
                 if (c->stream->open)
                     stream_close (c->stream);

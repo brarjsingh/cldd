@@ -18,11 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "cldd.h"
 #include "utils.h"
 
+/*
 int set_nonblocking (int fd)
 {
     int flags;
@@ -30,3 +31,37 @@ int set_nonblocking (int fd)
         flags = 0;
     return fcntl (fd, F_SETFL, flags | O_NONBLOCK);
 }
+*/
+
+bool
+rt_memlock (void)
+{
+    int ret;
+    struct sched_param sp;
+
+    if (geteuid () == 0)
+    {
+        memset (&sp, 0, sizeof (sp));
+        sp.sched_priority = sched_get_priority_max (SCHED_FIFO);
+        if ((ret = sched_setscheduler (0, SCHED_FIFO, &sp)) == -1)
+            return false;
+        if ((ret = mlockall (MCL_CURRENT | MCL_FUTURE)) == -1)
+            return false;
+        /* memory locking is complete if we made it here */
+        return true;
+    }
+    return false;
+}
+
+bool
+rt_hrtimers (void)
+{
+    struct timespec ts;
+
+    clock_getres (CLOCK_MONOTONIC, &ts);
+    if (ts.tv_nsec > 0)
+        return true;
+
+    return false;
+}
+

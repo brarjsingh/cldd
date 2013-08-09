@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "cldd.h"
 #include "error.h"
@@ -148,6 +148,7 @@ stream_thread (gpointer data)
                 "8|0.000,9|0.000,10|0.000,11|0.000,12|0.000,13|0.000,14|0.000,15|0.000,"
                 "16|0.000,17|0.000,18|0.000,19|0.000,20|0.000,21|0.000,21|0.000,23|0.000,"
                 "24|0.000,25|0.000,26|0.000,27|0.000,28|0.000,29|0.000,30|0.000,31|0.000\n");
+
         if ((n = writen (fd, buf, strlen (buf))) != strlen (buf))
             CLDD_MESSAGE("Client write error: %s", strerror (errno));
 

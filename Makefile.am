@@ -17,6 +17,15 @@ SUBDIRS = \
 	tests
 
 #
+# Data files for eg. configuration
+#
+
+data_cldddir = $(sysconfdir)/@PACKAGE@
+data_cldd_DATA = \
+	data/cldd.conf \
+	data/cld.xml
+
+#
 # Distribution
 #
 

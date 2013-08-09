@@ -39,8 +39,9 @@ struct _server {
     int port;               /**< port number to open for server */
     pid_t pid;              /**< pid of daemon process */
     bool running;           /**< flag used to stop process */
+    bool rt;                /**< flag to indicate that real-time was enabled */
     GList *client_list;     /**< client management */
-    GMutex *data_lock;      /**< data for threading */
+    GMutex data_lock;       /**< data for threading */
     /*@}*/
     /**
      * edge triggering client connections
@@ -50,6 +51,15 @@ struct _server {
     int num_fds;            /**< number of file descriptors that saw an event */
     struct epoll_event events[EPOLL_QUEUE_LEN]; /**< list of events */
     struct epoll_event event;                   /**< epoll data for setup */
+    /*@}*/
+    /**
+     * data collection and hardware control
+     */
+    CldBuilder *c_builder;
+    CldXmlConfig *c_xml;
+    struct daq_t *daq;
+    struct log_t *log;
+    /*@{*/
     /*@}*/
     /**
      * performance logging
@@ -72,6 +82,14 @@ struct _server {
  * @return Allocated data for a new server struct
  */
 server * server_new (void);
+
+/**
+ * Allocates memory for a new server struct.
+ *
+ * @param  options Command line data to use to create the server data with
+ * @return Allocated data for a new server struct
+ */
+server * server_new_from_options (struct options *so);
 
 /**
  * Frees any memory that was allocated for a server struct.

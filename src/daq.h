@@ -26,18 +26,21 @@
 BEGIN_C_DECLS
 
 /**
- * A structure that contains data needed for data acquisition
+ * A structure that contains data needed for acquisition
  */
 struct daq_t {
+    bool is_initialized;    /**< whether or not loaded from configuration */
     /*@{*/
-    GList *ai_chans;    /**< analog input channel list */
-    GList *ao_chans;    /**< analog output channel list */
-    GList *di_chans;    /**< digital input channel list */
-    GList *do_chans;    /**< digital output channel list */
-    GList *cnt_chans;   /**< counter channel list */
-    GList *uart_devs;   /**< uart device list */
+    CldDaq *c_daq;          /**< data for acquisition */
+    CldControl *c_control;  /**< control objects */
+    GeeMap *c_calibrations; /**< channel calibrations list */
+    GeeMap *c_channels;     /**< analog input channel list */
     /*@}*/
 };
+
+struct daq_t * daq_new (void);
+struct daq_t * daq_new_from_builder (CldBuilder *builder);
+void daq_free (struct daq_t *daq);
 
 /**
  * Thread function for analog input measurements from hardware devices.

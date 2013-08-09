@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <common.h>
+#include "common.h"
 
 #include "cldd.h"
 #include "adt.h"
@@ -31,6 +31,7 @@ server *
 server_new (void)
 {
     server *s = malloc (sizeof (server));
+
     if (s == NULL)
         CLDD_MESSAGE("LINE: %d, malloc() failed\n", __LINE__);
 
@@ -41,9 +42,28 @@ server_new (void)
     s->tx_rate = 0.0;
 
     /* create the mutexes for controlling access to thread data */
-    s->data_lock = g_mutex_new ();
+#ifdef GLIB232
+    g_mutex_init (&s->data_lock);
+//#else
+//    s->data_lock = g_mutex_new ();
+#endif
+
+    CLDD_MESSAGE("Loading xml configuration: "DATADIR"/cld.xml");
+fprintf (stderr, "err: "DATADIR"/cld.xml\n");
+    s->c_xml = cld_xml_config_new (DATADIR"/cld.xml");
+fprintf (stderr, "err:cld_xml_config_new\n");
+    s->c_builder = cld_builder_new_from_xml_config (s->c_xml);
+fprintf (stderr, "err:cld_builder_new_from_xml_config\n");
 
     return s;
+}
+
+server *
+server_new_from_options (struct options *so)
+{
+    /* just a placeholder for later when I get more ambitious on config and
+     * command line options stuff */
+    return server_new ();
 }
 
 void
@@ -53,7 +73,7 @@ server_free (server *s)
     g_list_free (s->client_list);
 
     /* destroy the locks */
-    g_mutex_free (s->data_lock);
+    g_mutex_free (&s->data_lock);
 
     /* string should be guaranteed to contain a value */
     free (s->log_filename);

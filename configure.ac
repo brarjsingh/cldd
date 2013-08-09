@@ -4,7 +4,7 @@ dnl point this just uses very pedestrian settings.
 dnl ---------------------------------------------------------------------------
 
 AC_PREREQ(2.59)
-AC_INIT([cldd],[0.1.0],[geoff.jay@gmail.com])
+AC_INIT([cldd],[0.2.0],[geoff.jay@gmail.com])
 AC_CONFIG_SRCDIR([src/main.c])
 AM_INIT_AUTOMAKE([dist-bzip2])
 AC_CONFIG_HEADER([config.h])
@@ -13,7 +13,7 @@ AM_MAINTAINER_MODE
 AC_ISC_POSIX
 CFLAGS="$CFLAGS"
 
-AC_DEFINE(PROTOCOL_VERSION, "0.1.0", [The CLD protocol version])
+AC_DEFINE(PROTOCOL_VERSION, "0.2.0", [The CLD protocol version])
 
 dnl ---------------------------------------------------------------------------
 dnl Programs
@@ -29,13 +29,36 @@ PKG_PROG_PKG_CONFIG
 #AC_PROG_LN_S
 
 dnl --------------------------------------------------------------------------
-dnl declare variables
+dnl Declare variables
 dnl --------------------------------------------------------------------------
 AC_SUBST(AM_CFLAGS,"")
 AC_SUBST(CLDD_CFLAGS)
 AC_SUBST(CLDD_LIBS)
 CLDD_LIBS=""
 CLDD_CFLAGS=""
+
+dnl Installation paths - there's got to be a better way to do this
+if test "x$prefix" = "xNONE" ; then
+	prefix="/usr/local"
+fi
+
+if test "x$exec_prefix" = "xNONE" ; then
+	exec_prefix=$prefix
+fi
+
+if test "x$sysconfdir" = "xNONE" ; then
+	sysconfdir="$prefix/etc"
+fi
+
+PREFIX=$prefix
+AC_SUBST(PREFIX)
+
+SYSCONFDIR="$prefix/etc"
+AC_SUBST(SYSCONFDIR)
+
+AC_DEFINE_UNQUOTED(DATADIR, "$SYSCONFDIR/$PACKAGE", [
+	Define the read-only architecture-independent data directory.
+	])
 
 dnl --------------------------------------------------------------------------
 dnl --with-<foo> options, pass --without-<foo> to disable
@@ -109,22 +132,52 @@ AC_CHECK_LIB(nsl, gethostbyname, CLDD_LIBS="$CLDD_LIBS -lnsl",)
 AC_CHECK_LIB(pthread, pthread_create, CLDD_LIBS="$CLDD_LIBS -pthread")
 AC_CHECK_LIB(m, cos, CLDD_LIBS="$CLDD_LIBS -lm")
 AC_CHECK_LIB(rt, clock_gettime, CLDD_LIBS="$CLDD_LIBS -lrt")
+dnl AC_CHECK_LIB(gthread-2.0, g_thread_init)
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h])
 AC_CHECK_HEADERS([valgrind/memcheck.h])
 
-PKG_CHECK_MODULES([GLIB], [glib-2.0 gobject-2.0],,
-	[AC_MSG_ERROR([glib-2.6 is required])])
+PKG_CHECK_MODULES([GLIB], [glib-2.32 gobject-2.0 gthread-2.0],
+	[AC_DEFINE(HAVE_GLIB232, [], [GLib 2.32 available])],
+	[PKG_CHECK_MODULES([GLIB], [glib-2.0 gobject-2.0 gthread-2.0],,
+		[AC_MSG_ERROR([glib-2.0 is required])])
+	])
+AC_SUBST(GLIB_CFLAGS)
+AC_SUBST(GLIB_LIBS)
 
-PKG_CHECK_MODULES([GLIBTOP], [libgtop-2.0],,
-	[AC_MSG_ERROR([libgtop-2.0 is required])])
+dnl PKG_CHECK_MODULES([GLIBTOP], [libgtop-2.0],,
+dnl 	[AC_MSG_ERROR([libgtop-2.0 is required])])
+
+PKG_CHECK_MODULES([GEE], [gee-1.0],,
+	[AC_MSG_ERROR([gee-1.0 is required])])
+AC_SUBST(GEE_CFLAGS)
+AC_SUBST(GEE_LIBS)
 
 PKG_CHECK_MODULES([XML], [libxml-2.0],,
 	[AC_MSG_ERROR([libxml-2.0 is required])])
+AC_SUBST(XML_CFLAGS)
+AC_SUBST(XML_LIBS)
 
-PKG_CHECK_MODULES([CLD], [cldd-0.1],,
-	[AC_MSG_ERROR([libcldd-0.1 is required])])
+PKG_CHECK_MODULES([CLD], [cldd-0.2 cld-0.2],,
+	[AC_MSG_ERROR([libcldd-0.2 and libcld-0.2 are required])])
+AC_SUBST(CLD_CFLAGS)
+AC_SUBST(CLD_LIBS)
+
+dnl ---------------------------------------------------------------------------
+dnl Comedi - requires comedi.pc
+dnl ---------------------------------------------------------------------------
+AC_ARG_WITH(comedi,
+[  --with-comedi		  use Comedi drivers],
+	[use_comedi=$withval],
+	[use_comedi=no])
+AC_MSG_RESULT(checking whether Comedi drivers were selected... $use_comedi)
+
+if test "x$use_comedi" != "xno" ; then
+	PKG_CHECK_MODULES([COMEDI], [comedi],,
+		[AC_MSG_ERROR([Comedi is required])])
+	AC_DEFINE(USE_COMEDI, [1], [Comedi Drivers])
+fi
 
 dnl ---------------------------------------------------------------------------
 dnl Allow tools to be specifically built
@@ -231,6 +284,24 @@ DX_PDF_FEATURE(OFF)
 DX_PS_FEATURE(OFF)
 
 DX_INIT_DOXYGEN([$PACKAGE_NAME],[doxygen.cfg])
+
+dnl ---------------------------------------------------------------------------
+dnl Additional build flags
+dnl ---------------------------------------------------------------------------
+if test x$GCC = xyes
+then
+	CLD_CHECK_FLAG([-g])
+	CLD_CHECK_FLAG([-Wall])
+	CLD_CHECK_FLAG([-Wextra])
+	CLD_CHECK_FLAG([-Wno-deprecated-declarations])
+	CLD_CHECK_FLAG([-Wmissing-prototypes])
+	CLD_CHECK_FLAG([-Wshadow])
+	CLD_CHECK_FLAG([-Wpointer-arith])
+	CLD_CHECK_FLAG([-Wstrict-prototypes])
+	CLD_CHECK_FLAG([-Wcast-qual])
+	CLD_CHECK_FLAG([-Wwrite-strings])
+	CLD_CHECK_FLAG([-pedantic])
+fi
 
 dnl ---------------------------------------------------------------------------
 dnl Pretty-Print Results

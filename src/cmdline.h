@@ -32,6 +32,8 @@ struct options {
     /*@{*/
     int  port;          /**< port number to use with the server */
     char *log_filename; /**< filename to write server statistics to */
+    char *cldd_config;  /**< file to load daemon configuration from */
+    char *cld_config;   /**< file to load CLD configuration from */
     bool kill;          /**< kill flag used to send shutdown signal to daemon */
     bool daemon;        /**< flag to tell process whether or not to daemonize */
     bool verbose;       /**< verbose command line output for debugging */
