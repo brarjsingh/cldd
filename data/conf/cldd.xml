@@ -2,127 +2,65 @@
 <!--
   Sample configuration file
   Geoff Johnson <geoff.jay@gmail.com>
-  2011-01-28
+  2013-08-17
 -->
-<cld xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:noNamespaceSchemaLocation="config.xsd">
+<cldd xmlns:cld="urn:libcld">
 
-    <!-- name of the application using this configuration -->
-    <property name="app">CRDC</property>
+    <property name="app">CLDD</property>
 
-    <!-- all of the objects should be loaded as a single treemap by the builder class -->
-    <objects>
+    <object id="msg0" type="messenger">
+        <property name="transport">tcp</property>
+        <property name="port">5556</property>
+    </object>
 
-        <!-- daq hardware configuration -->
-        <object id="daq0" type="daq">
-            <!-- daq rate in hz -->
-            <property name="rate">10.0</property>
-            <object id="dev0" type="device" driver="comedi">
-                <property name="hardware">PCI-1713</property>
-                <property name="type">input</property>
-                <property name="file">/dev/comedi0</property>
-            </object>
-            <object id="dev1" type="device" driver="comedi">
-                <property name="hardware">PCI-1720</property>
-                <property name="type">output</property>
-                <property name="file">/dev/comedi1</property>
-            </object>
-            <!-- virtual device to handle virtual channels -->
-            <object id="vdev0" type="device" driver="virtual">
-                <property name="hardware">VDEV-0</property>
-                <property name="type">input</property>
-                <!-- wonder if it's possible to use a pipe for this -->
-                <property name="file">/dev/null</property>
-            </object>
-        </object>
+    <object id="pub0" type="publisher">
+        <property name="transport">tcp</property>
+        <property name="port">5555</property>
+        <object id="pdu0" type="data-unit" ref="vc0"/>
+        <object id="pdu1" type="data-unit" ref="vc1"/>
+    </object>
 
-        <!-- log files configuration -->
-        <object id="log0" type="log">
-            <!-- path should end in / for now -->
-            <property name="title">Data Log</property>
-            <property name="path">/srv/data/crdc/</property>
-            <property name="file">log.dat</property>
-            <!-- log rate in hz -->
-            <property name="rate">10.000</property>
-            <property type="column" ref="ai0"/>
-            <property type="column" ref="ao0"/>
-            <property type="column" ref="di0"/>
-            <property type="column" ref="do0"/>
-        </object>
+    <cld:objects>
+        <cld:object id="daq0" type="daq">
+            <cld:object id="vdev0" type="device" driver="virtual">
+                <cld:property name="hardware">VDEV0</cld:property>
+                <cld:property name="type">input</cld:property>
+                <cld:property name="file">/dev/null</cld:property>
+            </cld:object>
+        </cld:object>
 
-        <!-- pid control loop configuration -->
-        <object id="ctl0" type="control">
-            <object id="pid0" type="pid">
-                <property name="sp">0.000000</property>
-                <property name="kp">0.100000</property>
-                <property name="ki">0.100000</property>
-                <property name="kd">0.100000</property>
-                <object id="pv0" type="process_value" chref="ai0"/>
-                <object id="pv1" type="process_value" chref="ao0"/>
-            </object>
-        </object>
+        <cld:object id="log0" type="log">
+            <cld:property name="title">Data Log</cld:property>
+            <cld:property name="path">/tmp/</cld:property>
+            <cld:property name="file">log.dat</cld:property>
+            <cld:property name="format">%F-%H%M%S</cld:property>
+            <cld:property name="rate" units="hz">10.000</cld:property>
+            <cld:object id="col0" type="column" ref="vc0"/>
+            <cld:object id="col1" type="column" ref="vc1"/>
+        </cld:object>
 
-        <!-- channel calibrations for scaling process values -->
-        <object id="cal0" type="calibration">
-            <!-- number of coefficients determines the order -->
-            <property name="units">Volts</property>
-            <!-- n determines the exponent - y = a[1]*x^1 + a[0]*x^0 -->
-            <object id="cft0" type="coefficient">
-                <property name="n">0</property>
-                <property name="value">0.000</property>
-            </object>
-            <object id="cft1" type="coefficient">
-                <property name="n">1</property>
-                <property name="value">1.000</property>
-            </object>
-        </object>
-        <object id="cal1" type="calibration">
-            <property name="units">Volts</property>
-            <object id="cft0" type="coefficient">
-                <property name="n">0</property>
-                <property name="value">0.000</property>
-            </object>
-            <object id="cft1" type="coefficient">
-                <property name="n">1</property>
-                <property name="value">1.000</property>
-            </object>
-        </object>
+        <cld:object id="ctl0" type="control">
+            <cld:object id="pid0" type="pid">
+                <cld:property name="sp">0.000000</cld:property>
+                <cld:property name="kp">0.100000</cld:property>
+                <cld:property name="ki">0.100000</cld:property>
+                <cld:property name="kd">0.100000</cld:property>
+                <cld:object id="pv0" type="process_value" chref="vc0"/>
+                <cld:object id="pv1" type="process_value" chref="vc1"/>
+            </cld:object>
+        </cld:object>
 
-        <!-- analog channel definitions -->
-        <object id="ai0" type="channel" ref="dev0" ctype="analog" direction="input">
-            <property name="tag">IN0</property>
-            <property name="desc">Sample Input</property>
-            <property name="num">0</property>
-            <property name="calref">cal0</property>
-        </object>
-        <object id="ai1" type="channel" ref="dev0" ctype="analog" direction="input">
-            <property name="tag">IN1</property>
-            <property name="desc">Sample Input</property>
-            <property name="num">1</property>
-            <property name="calref">cal1</property>
-        </object>
-        <object id="ao0" type="channel" ref="dev1" ctype="analog" direction="output">
-            <property name="tag">OUT0</property>
-            <property name="desc">Sample Output</property>
-            <property name="num">0</property>
-        </object>
-        <!-- virtual channels combine channels with simple math -->
-        <object id="vai0" type="channel" ref="vdev0" ctype="calculation" direction="input">
-            <property name="tag">VIN0</property>
-            <property name="desc">Sample Virtual Input</property>
-            <property name="num">2</property>
-            <property name="expression">(ai0)+(ai1)</property>
-        </object>
-        <!-- digital channel definitions -->
-        <object id="di0" type="channel" ref="dev0" ctype="digital" direction="input">
-            <property name="tag">IN0</property>
-            <property name="desc">Sample Input</property>
-            <property name="num">0</property>
-        </object>
-        <object id="do0" type="channel" ref="dev1" ctype="digital" direction="output">
-            <property name="tag">OUT0</property>
-            <property name="desc">Sample Output</property>
-            <property name="num">0</property>
-        </object>
-    </objects>
-</cld>
+        <cld:object id="vc0" type="channel" ref="vdev0" ctype="calculation" direction="input">
+            <cld:property name="tag">VC0</cld:property>
+            <cld:property name="desc">Sample Virtual Channel</cld:property>
+            <cld:property name="num">0</cld:property>
+            <cld:property name="expression">sin(t)</cld:property>
+        </cld:object>
+        <cld:object id="vc1" type="channel" ref="vdev0" ctype="calculation" direction="input">
+            <cld:property name="tag">VC0</cld:property>
+            <cld:property name="desc">Sample Virtual Channel</cld:property>
+            <cld:property name="num">1</cld:property>
+            <cld:property name="expression">1/sin(vc0)</cld:property>
+        </cld:object>
+    </cld:objects>
+</cldd>

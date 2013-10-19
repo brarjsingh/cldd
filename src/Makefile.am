@@ -2,7 +2,7 @@ bin_PROGRAMS = cldd
 
 VALAFLAGS = \
 	-H $(srcdir)/libcldd.h -C -c --thread \
-	--vapidir=$(srcdir)/../vapi -X -g \
+	--vapidir=$(srcdir)/../vapi -X -g --target-glib=2.32 \
 	@VALA_PACKAGES@ --pkg posix --pkg config
 
 cldd_CFLAGS = \
