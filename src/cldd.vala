@@ -1,35 +1,52 @@
 /**
+ * Copyright (C) 2010 Control, Logging, and Data Acquisition Daemon
+ * http://www.gitorious.org/cld/cldd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 using Config;
-using Posix;
 using ZMQ;
-
-/**
- * NOTE:
- * - tried to launch a thread, daemon dies immediately likely could be solved by
- *   starting the GLib loop
- */
 
 class Cldd.Application : GLib.Object {
 
-    private static pid_t pid;
-
+    /* Application data */
     private static GLib.MainLoop loop;
+    private static Posix.pid_t pid;
     private static bool done = false;
     private static Context context = new Context ();
 
-    /* Command line arguments. */
+    /* Command line arguments */
     private static bool kill = false;
+    private static bool daemonize = false;
     private static string cfgfile = null;
+    private static string pidfile = null;
     private static bool version = false;
 
     private const GLib.OptionEntry[] options = {{
         "kill", 'k', 0, OptionArg.NONE, ref kill,
         "Terminate a currently running CLDD instance.", null
     },{
+        "daemonize", 'd', 0, OptionArg.NONE, ref daemonize,
+        "Send the daemon to the background.", null
+    },{
         "config", 'c', 0, OptionArg.STRING, ref cfgfile,
         "Use the configuration file provided.", null
+    },{
+        "pidfile", 'p', 0, OptionArg.STRING, ref pidfile,
+        "Use the PID file provided.", null
     },{
         "version", 'V', 0, OptionArg.NONE, ref version,
         "Display CLDD version number.", null
@@ -37,15 +54,17 @@ class Cldd.Application : GLib.Object {
         null
     }};
 
-    /* XXX these will be loaded using configuration */
-    private int _port = 5555;
-    public int port {
-        get { return _port; }
-        set { _port = value; }
-    }
+    /* Application settings read from command line or configuration  */
+    private Settings settings;
+
+    /* Application configuration data */
+    private Config config;
+
+    /* Daemon component of application */
+    private Daemon daemon;
 
     /**
-     * Perform daemon initialization.
+     * Perform initialization.
      */
     public static int init (string[] args) {
 
@@ -63,31 +82,30 @@ class Cldd.Application : GLib.Object {
         if (version) {
             GLib.stdout.printf ("%s\n", PACKAGE_VERSION);
         } else {
-            /* Set indetification string for the daemon for both syslog and PID file */
-            Daemon.pid_file_ident = Daemon.log_ident = Daemon.ident_from_argv0 (args[0]);
 
             /* Check if we are called with -k parameter */
             if (kill) {
+                /* Kill using SIGINT */
+                return daemon.interupt ();
+            } else {
                 int ret;
 
-                /* Kill using SIGINT */
-                if ((ret = Daemon.pid_file_kill_wait (Daemon.Sig.INT, 5)) < 0)
-                    Daemon.log (Daemon.LogPriority.WARNING, "Failed to kill daemon.");
+                /* Setup CLD */
+                Cld.init (args);
 
-                return ret < 0 ? 1 : 0;
-            } else {
+                /* If no configuration file was given use the system one */
                 if (cfgfile == null) {
                     cfgfile = Path.build_filename (DATADIR, "cldd.xml");
                 }
 
+                config = new Cldd.Config (cfgfile);
+
                 /* Check that the daemon is not rung twice a the same time */
-                if ((pid = Daemon.pid_file_is_running ()) >= 0) {
-                    Daemon.log (Daemon.LogPriority.ERR, "Daemon already running on PID file %u", pid);
-                    return 1;
-                }
 
                 /* Prepare for return value passing from the initialization procedure of the daemon process */
-                Daemon.retval_init ();
+                ret = daemon.init ();
+
+                return ret;
             }
         }
 
@@ -98,32 +116,39 @@ class Cldd.Application : GLib.Object {
      * XXX fix this to spawn a thread for the main daemon body
      */
     public static void run () {
-        var responder = Socket.create (context, SocketType.REP);
-        //var responder_service = "tcp://*:%d".printf (port);
-        var responder_service = "tcp://*:%d".printf (5555);
-        responder.bind (responder_service);
+/*
+ *        var responder = Socket.create (context, SocketType.REP);
+ *        //var responder_service = "tcp://*:%d".printf (port);
+ *        var responder_service = "tcp://*:%d".printf (5555);
+ *        responder.bind (responder_service);
+ *
+ *        while (!done) {
+ *            var request = Msg ();
+ *            request.recv (responder);
+ *            Daemon.log (Daemon.LogPriority.INFO, "Received message: %s", request.data);
+ *
+ *            [> do something <]
+ *            Posix.sleep (1);
+ *
+ *            [> reply if necessary <]
+ *            var reply = Msg.with_data (request.data);
+ *            reply.send (responder);
+ *        }
+ */
 
-        while (!done) {
-            var request = Msg ();
-            request.recv (responder);
-            Daemon.log (Daemon.LogPriority.INFO, "Received message: %s", request.data);
+        loop = new MainLoop ();
 
-            /* do something */
-            Posix.sleep (1);
+        /* Launch daemon */
+        deamon.launch ();
+        daemon.closed.connect (() => { loop.quit (); });
 
-            /* reply if necessary */
-            var reply = Msg.with_data (request.data);
-            reply.send (responder);
-        }
+        loop.run ();
     }
 
     public static void quit () {
-        /* Do a cleanup */
-        Daemon.log (Daemon.LogPriority.INFO, "Exiting...");
-
-        Daemon.signal_done ();
-        Daemon.pid_file_remove ();
-
+        /* Cleanup */
+        daemon.close ();
+        daemon.pid_file_remove ();
         done = true;
     }
 
@@ -137,64 +162,12 @@ class Cldd.Application : GLib.Object {
         if ((_ret = init (args)) != 0)
             return _ret;
 
-        /* Do the fork */
-        if ((pid = Daemon.fork ()) < 0) {
+        /* XXX daemon creation goes here */
 
-            /* Exit on error */
-            Daemon.retval_done ();
-            return 1;
+        Posix.signal (Posix.SIGINT, quit);
 
-        } else if (pid != 0) {
-            /* The parent */
-            int ret;
+        run ();
 
-            /* Wait for 20 seconds for the return value passed from the daemon process */
-            if ((ret = Daemon.retval_wait (20)) < 0) {
-                Daemon.log (Daemon.LogPriority.ERR, "Could not recieve return value from daemon process.");
-                return 255;
-            }
-
-            Daemon.log (ret != 0 ? Daemon.LogPriority.ERR : Daemon.LogPriority.INFO, "Daemon returned %i as return value.", ret);
-            return ret;
-
-        } else {
-            /* The daemon */
-
-            /* Create the PID file */
-            if (Daemon.pid_file_create () < 0) {
-                Daemon.log (Daemon.LogPriority.ERR, "Could not create PID file (%s).", Posix.strerror (Posix.errno));
-
-                /* Send the error condition to the parent process */
-                Daemon.retval_send (1);
-                quit ();
-            }
-
-            /* Initialize signal handling */
-            if (Daemon.signal_init (Daemon.Sig.INT, Daemon.Sig.QUIT, Daemon.Sig.HUP, 0) < 0) {
-                Daemon.log (Daemon.LogPriority.ERR, "Could not register signal handlers (%s).", Posix.strerror (Posix.errno));
-                Daemon.retval_send (2);
-                quit ();
-            }
-
-            /* ... do some further init work here */
-
-            /* Send OK to parent process */
-            Daemon.retval_send (0);
-
-            Daemon.log (Daemon.LogPriority.INFO, "Sucessfully started");
-
-            /* This doesn't work with vala-0.14
-             *GLib.Unix.signal_add (Posix.SIGINT, () => {
-             *    daemon.quit ();
-             *    return 0;
-             *});
-             */
-
-            Posix.signal (Posix.SIGINT, quit);
-
-            run ();
-
-            return 0;
-        }
+        return 0;
     }
 }

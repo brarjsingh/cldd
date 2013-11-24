@@ -13,7 +13,6 @@ cldd_CFLAGS = \
 	$(GLIB_CFLAGS) \
 	$(GEE_CFLAGS) \
 	$(CLD_CFLAGS) \
-	$(DAEMON_CFLAGS) \
 	$(XML_CFLAGS) \
 	$(ZMQ_CFLAGS)
 
@@ -22,7 +21,6 @@ cldd_LDADD = \
 	$(GLIB_LIBS) \
 	$(GEE_LIBS) \
 	$(CLD_LIBS) \
-	$(DAEMON_LIBS) \
 	$(XML_LIBS) \
 	$(ZMQ_LIBS)
 
@@ -31,7 +29,10 @@ cldd_headers = \
 	libcldd.h
 
 cldd_SOURCES = \
-	cldd.vala
+	cldd.vala \
+	config.vala \
+	daemon.vala \
+	settings.vala
 
 CLEANFILES = \
 	*.stamp

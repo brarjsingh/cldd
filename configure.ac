@@ -20,7 +20,7 @@ dnl Programs
 dnl ---------------------------------------------------------------------------
 AC_PROG_CC
 AM_PROG_CC_STDC
-AM_PROG_VALAC([0.12.0])
+AM_PROG_VALAC([0.14.0])
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
@@ -67,10 +67,6 @@ AS_IF([test "x$with_gee10" != "xno"],
 PKG_CHECK_MODULES([CLD], [cld-0.2],
     [VALA_PACKAGES="$VALA_PACKAGES --pkg cld-0.2"],
     [AC_MSG_ERROR([cld-0.2 is required])])
-
-PKG_CHECK_MODULES([DAEMON], [libdaemon],
-    [VALA_PACKAGES="$VALA_PACKAGES --pkg libdaemon"],
-    [AC_MSG_ERROR([libdaemon is required])])
 
 PKG_CHECK_MODULES([XML], [libxml-2.0],
     [VALA_PACKAGES="$VALA_PACKAGES --pkg libxml-2.0"],

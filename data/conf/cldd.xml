@@ -57,7 +57,7 @@
             <cld:property name="expression">sin(t)</cld:property>
         </cld:object>
         <cld:object id="vc1" type="channel" ref="vdev0" ctype="calculation" direction="input">
-            <cld:property name="tag">VC0</cld:property>
+            <cld:property name="tag">VC1</cld:property>
             <cld:property name="desc">Sample Virtual Channel</cld:property>
             <cld:property name="num">1</cld:property>
             <cld:property name="expression">1/sin(vc0)</cld:property>
