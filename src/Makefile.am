@@ -1,59 +1,40 @@
-INCLUDES = \
-	$(CLDD_CFLAGS)
-
 bin_PROGRAMS = cldd
 
-noinst_LIBRARIES =
-
-AM_CFLAGS += -I$(srcdir)/src
-AM_CFLAGS += -DSYSTEM_CONFIG_FILE_LOCATION='"$(sysconfdir)/cldd.conf"'
+VALAFLAGS = \
+	-H $(srcdir)/libcldd.h -C -c --thread \
+	--vapidir=$(srcdir)/../vapi -X -g --target-glib=2.32 \
+	@VALA_PACKAGES@ --pkg posix --pkg config
 
 cldd_CFLAGS = \
+	-DPACKAGE_DATA_DIR=\""$(datadir)"\" \
+	-DPACKAGE_LOCALE_DIR=\""$(prefix)/$(DATADIRNAME)/locale"\" \
+	@PACKAGE_CFLAGS@ \
 	$(AM_CFLAGS) \
-	$(CLDD_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GEE_CFLAGS) \
 	$(CLD_CFLAGS) \
-	$(XML_CFLAGS)
+	$(XML_CFLAGS) \
+	$(ZMQ_CFLAGS)
 
 cldd_LDADD = \
-	$(CLDD_LIBS) \
+	@PACKAGE_LIBS@ \
 	$(GLIB_LIBS) \
 	$(GEE_LIBS) \
 	$(CLD_LIBS) \
 	$(XML_LIBS) \
-	$(INTLLIBS)
+	$(ZMQ_LIBS)
 
 cldd_headers = \
 	common.h \
-	cldd.h \
-	adt.h \
-	client.h \
-	cmdline.h \
-	conf.h \
-	daemon.h \
-	daq.h \
-	error.h \
-	log.h \
-	server.h \
-	stream.h \
-	utils.h
+	libcldd.h
 
 cldd_SOURCES = \
-	$(cldd_headers) \
-	main.c \
-	adt.c \
-	client.c \
-	cmdline.c \
-	conf.c \
-	daemon.c \
-	daq.c \
-	error.c \
-	log.c \
-	server.c \
-	stream.c \
-	utils.c
+	cldd.vala \
+	config.vala \
+	daemon.vala \
+	settings.vala
 
-noinst_HEADERS =
-
-CLEANFILES =
+CLEANFILES = \
+	*.stamp
+	stamp-h1
+	$(srcdir)/libcldd.h

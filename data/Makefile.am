@@ -1,0 +1,3 @@
+SUBDIRS = \
+	conf \
+	rc.d
