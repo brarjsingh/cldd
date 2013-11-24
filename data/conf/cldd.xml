@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  Sample configuration file
+  Geoff Johnson <geoff.jay@gmail.com>
+  2013-08-17
+-->
+<cldd xmlns:cld="urn:libcld">
+
+    <property name="app">CLDD</property>
+
+    <object id="msg0" type="messenger">
+        <property name="transport">tcp</property>
+        <property name="port">5556</property>
+    </object>
+
+    <object id="pub0" type="publisher">
+        <property name="transport">tcp</property>
+        <property name="port">5555</property>
+        <object id="pdu0" type="data-unit" ref="vc0"/>
+        <object id="pdu1" type="data-unit" ref="vc1"/>
+    </object>
+
+    <cld:objects>
+        <cld:object id="daq0" type="daq">
+            <cld:object id="vdev0" type="device" driver="virtual">
+                <cld:property name="hardware">VDEV0</cld:property>
+                <cld:property name="type">input</cld:property>
+                <cld:property name="file">/dev/null</cld:property>
+            </cld:object>
+        </cld:object>
+
+        <cld:object id="log0" type="log">
+            <cld:property name="title">Data Log</cld:property>
+            <cld:property name="path">/tmp/</cld:property>
+            <cld:property name="file">log.dat</cld:property>
+            <cld:property name="format">%F-%H%M%S</cld:property>
+            <cld:property name="rate" units="hz">10.000</cld:property>
+            <cld:object id="col0" type="column" ref="vc0"/>
+            <cld:object id="col1" type="column" ref="vc1"/>
+        </cld:object>
+
+        <cld:object id="ctl0" type="control">
+            <cld:object id="pid0" type="pid">
+                <cld:property name="sp">0.000000</cld:property>
+                <cld:property name="kp">0.100000</cld:property>
+                <cld:property name="ki">0.100000</cld:property>
+                <cld:property name="kd">0.100000</cld:property>
+                <cld:object id="pv0" type="process_value" chref="vc0"/>
+                <cld:object id="pv1" type="process_value" chref="vc1"/>
+            </cld:object>
+        </cld:object>
+
+        <cld:object id="vc0" type="channel" ref="vdev0" ctype="calculation" direction="input">
+            <cld:property name="tag">VC0</cld:property>
+            <cld:property name="desc">Sample Virtual Channel</cld:property>
+            <cld:property name="num">0</cld:property>
+            <cld:property name="expression">sin(t)</cld:property>
+        </cld:object>
+        <cld:object id="vc1" type="channel" ref="vdev0" ctype="calculation" direction="input">
+            <cld:property name="tag">VC1</cld:property>
+            <cld:property name="desc">Sample Virtual Channel</cld:property>
+            <cld:property name="num">1</cld:property>
+            <cld:property name="expression">1/sin(vc0)</cld:property>
+        </cld:object>
+    </cld:objects>
+</cldd>

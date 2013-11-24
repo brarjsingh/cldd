@@ -1,18 +1,26 @@
-# Object files
+# file excludes
+*~
 *.o
-*.ko
+*.swp
 
-# Libraries
-*.lib
-*.a
+# auto generated file excludes
+Makefile
+Makefile.in
+compile
+config.h
+config.h.in
+config.log
+config.status
+configure
+depcomp
+install-sh
+missing
+stamp-h1
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+# executables
+src/cldd
 
-# Executables
-*.exe
-*.out
-*.app
+# auto generated directory excludes
+autom4te.cache/
+src/.deps
+tests/.deps
