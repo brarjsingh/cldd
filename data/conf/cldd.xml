@@ -8,16 +8,27 @@
 
     <property name="app">CLDD</property>
 
-    <object id="msg0" type="messenger">
-        <property name="transport">tcp</property>
-        <property name="port">5556</property>
-    </object>
-
+    <!-- XXX should probably go to libcld for it to handle the client/server bit -->
     <object id="pub0" type="publisher">
         <property name="transport">tcp</property>
         <property name="port">5555</property>
         <object id="pdu0" type="data-unit" ref="vc0"/>
         <object id="pdu1" type="data-unit" ref="vc1"/>
+    </object>
+
+    <!-- XXX not sure yet, but the client config should look something like -->
+    <!--
+    <object id="sub0" type="subscriber">
+        <property name="transport">tcp</property>
+        <property name="port">5555</property>
+        <object id="pdu0" type="data-unit" />
+        <object id="pdu1" type="data-unit" />
+    </object>
+    -->
+
+    <object id="msg0" type="messenger">
+        <property name="transport">tcp</property>
+        <property name="port">5556</property>
     </object>
 
     <cld:objects>
