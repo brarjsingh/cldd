@@ -7,15 +7,22 @@
 Makefile
 Makefile.in
 compile
+config.guess
 config.h
 config.h.in
 config.log
 config.status
+config.sub
 configure
 depcomp
 install-sh
 missing
 stamp-h1
+src/cldd_vala.stamp
+
+# auto generated source files
+*.c
+*.h
 
 # executables
 src/cldd

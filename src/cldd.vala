@@ -20,12 +20,10 @@
 using Config;
 using ZMQ;
 
-class Cldd.Application : GLib.Object {
+public class Cldd.Application : GLib.Object {
 
     /* Application data */
     private static GLib.MainLoop loop;
-    private static Posix.pid_t pid;
-    private static bool done = false;
     private static Context context = new Context ();
 
     /* Command line arguments */
@@ -55,18 +53,20 @@ class Cldd.Application : GLib.Object {
     }};
 
     /* Application settings read from command line or configuration  */
-    private Settings settings;
+    private static Settings settings;
 
     /* Application configuration data */
-    private Config config;
+    private static Config config;
 
     /* Daemon component of application */
-    private Daemon daemon;
+    private static Daemon daemon;
 
     /**
      * Perform initialization.
      */
     public static int init (string[] args) {
+
+        daemon = new Daemon ();
 
         try {
             var opt_context = new OptionContext (PACKAGE_NAME);
@@ -74,22 +74,20 @@ class Cldd.Application : GLib.Object {
             opt_context.add_main_entries (options, null);
             opt_context.parse (ref args);
         } catch (OptionError e) {
-            GLib.stdout.printf ("error: %s\n", e.message);
-            GLib.stdout.printf ("Run `%s --help' to see a full list of available command line options\n", args[0]);
+            stdout.printf ("Launch error: %s\n", e.message);
+            stdout.printf ("Run `%s --help' to see a full list of available command line options\n", args[0]);
             return 1;
         }
 
         if (version) {
-            GLib.stdout.printf ("%s\n", PACKAGE_VERSION);
+            stdout.printf ("%s\n", PACKAGE_VERSION);
         } else {
 
             /* Check if we are called with -k parameter */
             if (kill) {
                 /* Kill using SIGINT */
-                return daemon.interupt ();
+                return daemon.interrupt ();
             } else {
-                int ret;
-
                 /* Setup CLD */
                 Cld.init (args);
 
@@ -102,10 +100,8 @@ class Cldd.Application : GLib.Object {
 
                 /* Check that the daemon is not rung twice a the same time */
 
-                /* Prepare for return value passing from the initialization procedure of the daemon process */
-                ret = daemon.init ();
-
-                return ret;
+                /* Daemonize the process */
+                daemon.init ();
             }
         }
 
@@ -113,9 +109,34 @@ class Cldd.Application : GLib.Object {
     }
 
     /**
-     * XXX fix this to spawn a thread for the main daemon body
+     * Async method to do the work of the daemon.
+     */
+    public static async bool worker (string domain) throws ThreadError {
+        SourceFunc callback = worker.callback;
+        bool ret = false;
+
+        ThreadFunc<void *> run = () => {
+            while (daemon.running) {
+                /* Log a message once an hour for now */
+                //Thread.usleep ((ulong)3600000000);
+                Thread.usleep ((ulong)60000000);
+                Posix.syslog (Posix.LOG_NOTICE, "(CLDD) still going");
+            }
+            Idle.add ((owned) callback);
+            return null;
+        };
+        Thread.create<void *>(run, false);
+
+        yield;
+
+        return ret;
+    }
+
+    /**
+     * Sets up the async code and launches the main loop.
      */
     public static void run () {
+        /* TODO: implement the ZMQ stuff in the async method */
 /*
  *        var responder = Socket.create (context, SocketType.REP);
  *        //var responder_service = "tcp://*:%d".printf (port);
@@ -137,19 +158,19 @@ class Cldd.Application : GLib.Object {
  */
 
         loop = new MainLoop ();
-
-        /* Launch daemon */
-        deamon.launch ();
         daemon.closed.connect (() => { loop.quit (); });
 
-        loop.run ();
-    }
+        /* Start the async method */
+        worker.begin ("cldd", (obj, res) => {
+            try {
+                bool result = worker.end (res);
+                Posix.syslog (Posix.LOG_NOTICE, "(CLDD) worker ended");
+            } catch (ThreadError e) {
+                Posix.syslog (Posix.LOG_NOTICE, "(CLDD) thread error");
+            }
+        });
 
-    public static void quit () {
-        /* Cleanup */
-        daemon.close ();
-        daemon.pid_file_remove ();
-        done = true;
+        loop.run ();
     }
 
     /**
@@ -157,14 +178,10 @@ class Cldd.Application : GLib.Object {
      */
     public static int main (string[] args) {
 
-        int _ret = 0;
+        int ret = 0;
 
-        if ((_ret = init (args)) != 0)
-            return _ret;
-
-        /* XXX daemon creation goes here */
-
-        Posix.signal (Posix.SIGINT, quit);
+        if ((ret = init (args)) != 0)
+            return ret;
 
         run ();
 
