@@ -1,0 +1,9 @@
+Control Logging and Data Acquisition Daemon
+
+Needs to be implemented:
+
+- load config from system or user rc file depending on daemon or not
+- implement daemon code, still not sure whether or not to do a typical daemon or
+  use glib-esque main loop with async method, the latter is probably easier
+- define message handling for ZeroMQ and Protocol Buffer implementation, this
+  will probably happen inside of libcld

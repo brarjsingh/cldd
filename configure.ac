@@ -48,7 +48,7 @@ VALA_PACKAGES=""
 dnl ---------------------------------------------------------------------------
 dnl Headers/Libraries
 dnl ---------------------------------------------------------------------------
-PKG_CHECK_MODULES([GLIB], [glib-2.0 gthread-2.0 gmodule-2.0 gobject-2.0],,
+PKG_CHECK_MODULES([GLIB], [glib-2.0],,
     [AC_MSG_ERROR([glib2 is required])])
 
 AC_ARG_WITH(gee08, AS_HELP_STRING([--with-gee08], [Use libgee-0.8]), [with_gee08=yes], [with_gee08=no])
@@ -63,6 +63,10 @@ AS_IF([test "x$with_gee10" != "xno"],
       [AC_DEFINE(WITH_GEE_10, [1], ["Using libgee-1.0"])]
       [PKG_CHECK_MODULES([GEE], [gee-1.0], [VALA_PACKAGES="$VALA_PACKAGES --pkg gee-1.0"],
                          [AC_MSG_ERROR([libgee-1.0 is required])])])
+
+PKG_CHECK_MODULES([GIO], [gio-2.0],
+    [VALA_PACKAGES="$VALA_PACKAGES --pkg gio-2.0"],
+    [AC_MSG_ERROR([gio-2.0 is required])])
 
 PKG_CHECK_MODULES([CLD], [cld-0.2],
     [VALA_PACKAGES="$VALA_PACKAGES --pkg cld-0.2"],
@@ -80,7 +84,8 @@ dnl Comedi
 AC_ARG_WITH(comedi, AS_HELP_STRING([--with-comedi], [Use Comedi drivers]), [with_comedi=yes], [with_comedi=no])
 AS_IF([test "x$with_comedi" != "xno"],
       [AC_DEFINE(USE_COMEDI, [1], ["Comedi drivers"])]
-      [PKG_CHECK_MODULES([COMEDI], [comedi],,
+      [PKG_CHECK_MODULES([COMEDI], [comedi],
+                         [VALA_PACKAGES="$VALA_PACKAGES --pkg comedi"],
                          [AC_MSG_ERROR([Comedi is required])])])
 
 dnl Package setup for Vala files

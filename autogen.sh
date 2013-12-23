@@ -10,7 +10,7 @@ cd $srcdir
 PKG_NAME="cldd"
 
 (test -f $srcdir/configure.ac \
-  && test -f $srcdir/README \
+  && test -f $srcdir/README.md \
   && test -d $srcdir/src) || {
     echo -n "**Error**: Directory "\`$srcdir\'" does not look like the"
     echo " top-level $PKG_NAME directory"

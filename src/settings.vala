@@ -1,6 +1,6 @@
 /**
  * Copyright (C) 2010 Control, Logging, and Data Acquisition Daemon
- * http://www.gitorious.org/cld/cldd
+ * http://www.github.com/geoffjay/cldd
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,8 +20,8 @@
 public class Cldd.Settings : GLib.Object {
 
     /* XXX this probably doesn't need a property backing field */
-    private int _app = "CLDD";
-    public int app {
+    private string _app = "CLDD";
+    public string app {
         get { return _app; }
         set { _app = value; }
     }
@@ -31,6 +31,6 @@ public class Cldd.Settings : GLib.Object {
 
     /* Construction to load settings from configuration data provided */
     public Settings.with_config (Config config) {
-        port = config.get_string_property ("app");
+        app = config.get_string_property ("app");
     }
 }

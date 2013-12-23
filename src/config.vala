@@ -1,6 +1,6 @@
 /**
  * Copyright (C) 2010 Control, Logging, and Data Acquisition Daemon
- * http://www.gitorious.org/cld/cldd
+ * http://www.github.com/geoffjay/cldd
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
